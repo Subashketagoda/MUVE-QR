@@ -7,31 +7,38 @@ on:
 
 jobs:
   build-apk:
-    name: Build Android Release APK
+    name: Build Genuine Android APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Install Node Dependencies
-        run: npm ci || npm install
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Build Next.js Web App
-        run: npm run build
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
 
-      - name: Package Release APK
-        run: node scripts/build-sample-apk.js
+      - name: Generate and Build Real Android APK
+        run: |
+          mkdir -p twa-project
+          cd twa-project
+          mkdir -p ~/.bubblewrap
+          echo "{\"jdkPath\":\"$JAVA_HOME\",\"androidSdkPath\":\"$ANDROID_HOME\"}" > ~/.bubblewrap/config.json
+          bubblewrap init --manifest="https://muve-qr.vercel.app/manifest.json" --skipPwaValidation
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
-      - name: Upload APK Artifact
+      - name: Upload Real Android APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: muve-qr-v1.0.0-apk
-          path: public/downloads/muve-qr-v1.0.0.apk
+          path: twa-project/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
