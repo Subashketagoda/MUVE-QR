@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Logo } from '@/components/shared/Logo'
-import { QrCode, MapPin, Clock, Calendar, ChevronRight, ShieldCheck } from 'lucide-react'
+import { QrCode, MapPin, Clock, Calendar, ChevronRight, ShieldCheck, Smartphone, Download } from 'lucide-react'
 
 export default function UserHomePage() {
   const [user, setUser] = useState<any>(null)
@@ -113,6 +113,28 @@ export default function UserHomePage() {
           </div>
         </div>
         <ChevronRight className="w-6 h-6 text-white/70 group-hover:translate-x-1 transition" />
+      </Link>
+
+      {/* Android APK Download Card */}
+      <Link
+        href="/download"
+        className="card p-4 bg-navy-950 text-white border border-white/10 rounded-2xl flex items-center justify-between shadow-md hover:border-[#D4FC04]/50 transition group"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#D4FC04]/10 border border-[#D4FC04]/20 flex items-center justify-center text-[#D4FC04]">
+            <Smartphone className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="font-bold text-sm text-white flex items-center gap-2">
+              Download Android APK
+              <span className="text-[10px] bg-[#D4FC04] text-black font-extrabold px-1.5 py-0.5 rounded">NEW</span>
+            </h4>
+            <p className="text-xs text-slate-400">Install native APK or add to home screen</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-xs font-bold text-[#D4FC04] group-hover:translate-x-0.5 transition-transform">
+          <Download className="w-4 h-4" />
+        </div>
       </Link>
 
       {/* Recent Scans Section */}

@@ -4,12 +4,12 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Logo } from '@/components/shared/Logo'
 import { toast } from 'sonner'
-import { LogIn, ShieldCheck, UserCheck, ArrowRight, QrCode } from 'lucide-react'
+import { LogIn, ArrowRight } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('admin@muveqr.app')
-  const [password, setPassword] = useState('Admin@123456')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -44,19 +44,6 @@ export default function LoginPage() {
     }
   }
 
-  const fillDemoAccount = (role: 'admin' | 'user01' | 'user02') => {
-    if (role === 'admin') {
-      setEmail('admin@muveqr.app')
-      setPassword('Admin@123456')
-    } else if (role === 'user01') {
-      setEmail('user01@muveqr.app')
-      setPassword('User@123456')
-    } else {
-      setEmail('user02@muveqr.app')
-      setPassword('User@123456')
-    }
-  }
-
   return (
     <div className="min-h-screen bg-[#072B3B] flex flex-col justify-center items-center p-4 relative overflow-hidden">
       {/* Background Subtle Glowing Accents */}
@@ -83,26 +70,26 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="form-label text-slate-700">Email Address</label>
+              <label className="label text-xs font-semibold text-slate-700">Email Address</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@organization.com"
-                className="form-input text-slate-900"
+                placeholder="name@company.com"
+                className="input text-slate-900"
               />
             </div>
 
             <div>
-              <label className="form-label text-slate-700">Password</label>
+              <label className="label text-xs font-semibold text-slate-700">Password</label>
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="form-input text-slate-900"
+                className="input text-slate-900"
               />
             </div>
 
@@ -125,39 +112,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Selector */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              One-Click Demo Accounts
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => fillDemoAccount('admin')}
-                className="p-2 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg flex flex-col items-center gap-1 transition cursor-pointer"
-              >
-                <ShieldCheck className="w-4 h-4 text-blue-600" />
-                <span>Admin</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemoAccount('user01')}
-                className="p-2 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg flex flex-col items-center gap-1 transition cursor-pointer"
-              >
-                <UserCheck className="w-4 h-4 text-emerald-600" />
-                <span>User 01</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemoAccount('user02')}
-                className="p-2 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg flex flex-col items-center gap-1 transition cursor-pointer"
-              >
-                <QrCode className="w-4 h-4 text-purple-600" />
-                <span>User 02</span>
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}

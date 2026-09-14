@@ -298,47 +298,6 @@ export default function QRCodesPage() {
                 </select>
               </div>
 
-              {/* Geofencing Config */}
-              <div className="pt-2 border-t border-slate-100">
-                <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-                  Geofencing Verification (Optional)
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="form-label text-[11px]">Latitude</label>
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="6.9271"
-                      value={formData.latitude}
-                      onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
-                      className="form-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label text-[11px]">Longitude</label>
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="79.8612"
-                      value={formData.longitude}
-                      onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
-                      className="form-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label text-[11px]">Radius (m)</label>
-                    <input
-                      type="number"
-                      placeholder="100"
-                      value={formData.geofence_radius}
-                      onChange={(e) => setFormData({ ...formData, geofence_radius: e.target.value })}
-                      className="form-input text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
