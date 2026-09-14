@@ -1,0 +1,98 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { INITIAL_USERS, INITIAL_AUDIT_LOGS } from '@/lib/demo-store'
+import { nanoid } from 'nanoid'
+
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params
+    const body = await req.json()
+    const { full_name, email, phone, role, status, password } = body
+
+    const isSupabaseConfigured =
+      !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+
+    const updatePayload: any = { updated_at: new Date().toISOString() }
+    if (full_name !== undefined) updatePayload.full_name = full_name
+    if (email !== undefined) updatePayload.email = email
+    if (phone !== undefined) updatePayload.phone = phone
+    if (role !== undefined) updatePayload.role = role
+    if (status !== undefined) updatePayload.status = status
+
+    if (isSupabaseConfigured) {
+      if (password) {
+        await supabaseAdmin.auth.admin.updateUserById(id, { password })
+      }
+
+      const { data, error } = await (supabaseAdmin as any)
+        .from('users')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      await (supabaseAdmin as any).from('audit_logs').insert({
+        admin_name: 'System Admin',
+        action: status ? `user_${status}` : 'user_edited',
+        target_type: 'user',
+        target_id: id,
+        target_name: data.full_name,
+        details: updatePayload,
+      })
+
+      return NextResponse.json({ success: true, user: data })
+    }
+
+    // Demo store
+    const idx = INITIAL_USERS.findIndex((u) => u.id === id)
+    if (idx === -1) {
+      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
+    }
+
+    INITIAL_USERS[idx] = { ...INITIAL_USERS[idx], ...updatePayload }
+    const updated = INITIAL_USERS[idx]
+
+    INITIAL_AUDIT_LOGS.unshift({
+      id: `audit_${nanoid(8)}`,
+      admin_id: 'usr_admin_001',
+      admin_name: 'System Admin',
+      action: status ? `user_${status}` : 'user_edited',
+      target_type: 'user',
+      target_id: id,
+      target_name: updated.full_name,
+      details: updatePayload,
+      ip_address: '127.0.0.1',
+      created_at: new Date().toISOString(),
+    })
+
+    return NextResponse.json({ success: true, user: updated })
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params
+    const isSupabaseConfigured =
+      !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+
+    if (isSupabaseConfigured) {
+      await supabaseAdmin.auth.admin.deleteUser(id)
+      await (supabaseAdmin as any).from('users').delete().eq('id', id)
+      return NextResponse.json({ success: true, message: 'User deleted' })
+    }
+
+    const idx = INITIAL_USERS.findIndex((u) => u.id === id)
+    if (idx !== -1) {
+      INITIAL_USERS.splice(idx, 1)
+    }
+    return NextResponse.json({ success: true, message: 'User deleted' })
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 })
+  }
+}
