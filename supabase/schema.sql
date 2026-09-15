@@ -168,7 +168,26 @@ DROP POLICY IF EXISTS "Public access settings" ON public.settings;
 CREATE POLICY "Public access settings" ON public.settings FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================================
--- 10. REALTIME PUBLICATION SETUP
+-- 10. REALTIME PUBLICATION SETUP (Idempotent safe check)
 -- ============================================================
-ALTER PUBLICATION supabase_realtime ADD TABLE public.scan_logs;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' 
+    AND schemaname = 'public' 
+    AND tablename = 'scan_logs'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.scan_logs;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' 
+    AND schemaname = 'public' 
+    AND tablename = 'notifications'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+  END IF;
+END $$;
+
