@@ -57,7 +57,7 @@ export async function middleware(request: NextRequest) {
 
   const hasSession = !!sessionUser
 
-  const publicRoutes = ['/login', '/scan', '/download']
+  const publicRoutes = ['/login', '/scan', '/download', '/app']
   const isPublic = publicRoutes.some((r) => pathname.startsWith(r)) || pathname === '/'
 
   if (!hasSession && !isPublic) {
