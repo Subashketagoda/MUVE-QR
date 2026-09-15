@@ -8,6 +8,21 @@ function cleanPhone(val: string): string {
   return (val || '').replace(/[\s\-\(\)\.]/g, '')
 }
 
+function createAuthResponse(user: any) {
+  const res = NextResponse.json({
+    success: true,
+    user,
+  })
+
+  res.cookies.set('muve_session', encodeURIComponent(JSON.stringify(user)), {
+    path: '/',
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+    sameSite: 'lax',
+  })
+
+  return res
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -46,15 +61,12 @@ export async function POST(req: NextRequest) {
           })
 
           if (found) {
-            return NextResponse.json({
-              success: true,
-              user: {
-                id: found.id,
-                phone: found.phone || rawIdentifier,
-                email: found.email,
-                role: found.role || 'user',
-                full_name: found.full_name || 'User',
-              },
+            return createAuthResponse({
+              id: found.id,
+              phone: found.phone || rawIdentifier,
+              email: found.email,
+              role: found.role || 'user',
+              full_name: found.full_name || 'User',
             })
           }
         }
@@ -79,15 +91,12 @@ export async function POST(req: NextRequest) {
           .eq('id', data.user.id)
           .single()
 
-        return NextResponse.json({
-          success: true,
-          user: {
-            id: data.user.id,
-            phone: profile?.phone || rawIdentifier,
-            email: data.user.email,
-            role: profile?.role || 'user',
-            full_name: profile?.full_name || 'User',
-          },
+        return createAuthResponse({
+          id: data.user.id,
+          phone: profile?.phone || rawIdentifier,
+          email: data.user.email,
+          role: profile?.role || 'user',
+          full_name: profile?.full_name || 'User',
         })
       }
     }
@@ -141,15 +150,12 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: demoUser.id,
-        phone: demoUser.phone,
-        email: demoUser.email,
-        role: demoUser.role,
-        full_name: demoUser.full_name,
-      },
+    return createAuthResponse({
+      id: demoUser.id,
+      phone: demoUser.phone,
+      email: demoUser.email,
+      role: demoUser.role,
+      full_name: demoUser.full_name,
     })
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 })

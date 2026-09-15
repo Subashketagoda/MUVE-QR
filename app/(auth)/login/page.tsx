@@ -35,6 +35,7 @@ export default function LoginPage() {
 
       // Save user session details in localStorage for client state persistence
       localStorage.setItem('muve_user', JSON.stringify(data.user))
+      document.cookie = `muve_session=${encodeURIComponent(JSON.stringify(data.user))}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`
 
       const targetUrl = data.user.role === 'admin' ? '/admin/dashboard' : '/app/home'
       window.location.href = targetUrl

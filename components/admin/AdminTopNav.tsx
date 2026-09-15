@@ -52,6 +52,7 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({ onMenuClick }) => {
 
   const handleLogout = () => {
     localStorage.removeItem('muve_user')
+    document.cookie = 'muve_session=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'
     toast.success('Logged out successfully')
     router.push('/login')
   }

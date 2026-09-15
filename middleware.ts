@@ -47,15 +47,26 @@ export async function middleware(request: NextRequest) {
     user = data.user
   } catch (e) {}
 
-  const publicRoutes = ['/login', '/scan']
-  const isPublic = publicRoutes.some((r) => pathname.startsWith(r))
+  const sessionCookie = request.cookies.get('muve_session')?.value
+  let sessionUser = user
+  if (!sessionUser && sessionCookie) {
+    try {
+      sessionUser = JSON.parse(decodeURIComponent(sessionCookie))
+    } catch (e) {}
+  }
 
-  if (!user && !isPublic) {
+  const hasSession = !!sessionUser
+
+  const publicRoutes = ['/login', '/scan', '/download']
+  const isPublic = publicRoutes.some((r) => pathname.startsWith(r)) || pathname === '/'
+
+  if (!hasSession && !isPublic) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (user && pathname === '/login') {
-    return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+  if (hasSession && pathname === '/login') {
+    const targetUrl = sessionUser?.role === 'admin' ? '/admin/dashboard' : '/app/home'
+    return NextResponse.redirect(new URL(targetUrl, request.url))
   }
 
   return response
