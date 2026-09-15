@@ -355,6 +355,8 @@ export default function UserScanPage() {
         }),
       })
 
+      const json = await res.json()
+
       const playScanBeep = (isSuccess = true) => {
         try {
           const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
@@ -417,7 +419,8 @@ export default function UserScanPage() {
         localStorage.setItem('muve_local_scans', JSON.stringify(merged))
       } catch (e) {}
     } catch (err: any) {
-      setScanError('Network connection error while recording scan')
+      console.error('Scan error:', err)
+      setScanError(err?.message || 'Network connection error while recording scan')
     } finally {
       setScanning(false)
     }
