@@ -151,12 +151,116 @@ export default function QRCodesPage() {
     }
   }
 
-  const handleDownloadQR = (qr: QRCodeRow, dataUrl?: string) => {
-    const link = document.createElement('a')
-    link.href = dataUrl || qrImageDataUrl
-    link.download = `MUVE_QR_${qr.name}_${qr.location_name.replace(/\s+/g, '_')}.png`
-    link.click()
-    toast.success('QR Code image downloaded')
+  const handleDownloadQR = async (qr: QRCodeRow, dataUrl?: string) => {
+    try {
+      let finalUrl = dataUrl || qrImageDataUrl
+      if (!finalUrl) {
+        const qrScanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muveqr.app/scan'}/${qr.token}`
+        finalUrl = await QRCode.toDataURL(qrScanUrl, {
+          width: 800,
+          margin: 2,
+          color: {
+            dark: '#072B3B',
+            light: '#FFFFFF',
+          },
+        })
+      }
+
+      // Convert data URL to Blob for rock-solid cross-browser & mobile downloads
+      const res = await fetch(finalUrl)
+      const blob = await res.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const filename = `MUVE_QR_${qr.name}_${qr.location_name.replace(/\s+/g, '_')}.png`
+
+      // On mobile devices, try native Web Share API to allow Save to Photos/Gallery
+      if (typeof navigator !== 'undefined' && navigator.share && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        try {
+          const file = new File([blob], filename, { type: 'image/png' })
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: `MUVE QR - ${qr.name}`,
+              text: `QR Code for ${qr.location_name}`,
+            })
+            toast.success('QR Code shared / saved')
+            return
+          }
+        } catch (shareErr: any) {
+          if (shareErr.name === 'AbortError') return
+        }
+      }
+
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      setTimeout(() => {
+        document.body.removeChild(link)
+        URL.revokeObjectURL(blobUrl)
+      }, 200)
+
+      toast.success('QR Code image downloaded')
+    } catch (e) {
+      console.error('Download error:', e)
+      toast.error('Failed to download QR code')
+    }
+  }
+
+  const handleDownloadPDF = async (qr: QRCodeRow) => {
+    try {
+      const { jsPDF } = await import('jspdf')
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+      const qrScanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muveqr.app/scan'}/${qr.token}`
+      const url = await QRCode.toDataURL(qrScanUrl, { width: 600, margin: 2 })
+
+      // Header branding
+      doc.setFillColor(7, 43, 59)
+      doc.rect(0, 0, 210, 36, 'F')
+
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(22)
+      doc.setFont('helvetica', 'bold')
+      doc.text('MUVE QR', 105, 20, { align: 'center' })
+
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text('ENTERPRISE ACTIVITY & LOCATION TRACKING', 105, 28, { align: 'center' })
+
+      // Checkpoint details
+      doc.setTextColor(15, 23, 42)
+      doc.setFontSize(20)
+      doc.setFont('helvetica', 'bold')
+      doc.text(qr.name, 105, 54, { align: 'center' })
+
+      doc.setTextColor(37, 99, 235)
+      doc.setFontSize(13)
+      doc.text(qr.location_name, 105, 63, { align: 'center' })
+
+      // QR Code image
+      doc.addImage(url, 'PNG', 45, 74, 120, 120)
+
+      // Token display box
+      doc.setFillColor(241, 245, 249)
+      doc.roundedRect(30, 204, 150, 14, 3, 3, 'F')
+      doc.setTextColor(100, 116, 139)
+      doc.setFontSize(8)
+      doc.setFont('courier', 'bold')
+      doc.text(`Token: ${qr.token}`, 105, 213, { align: 'center' })
+
+      // Instructions
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(100, 116, 139)
+      doc.text('Scan with your smartphone camera or the official MUVE QR Mobile App', 105, 235, { align: 'center' })
+
+      doc.save(`MUVE_QR_PRINT_${qr.name}_${qr.location_name.replace(/\s+/g, '_')}.pdf`)
+      toast.success('PDF Badge downloaded!')
+    } catch (e) {
+      console.error('PDF error:', e)
+      toast.error('Failed to generate PDF')
+    }
   }
 
   const handlePrintQR = (qr: QRCodeRow) => {
@@ -226,6 +330,7 @@ export default function QRCodesPage() {
               key={qr.id}
               qr={qr}
               onPreview={() => handleOpenPreview(qr)}
+              onDownload={(url) => handleDownloadQR(qr, url)}
               onEdit={() => handleOpenEditModal(qr)}
               onToggleStatus={() => handleToggleStatus(qr)}
               onPrint={() => handlePrintQR(qr)}
@@ -345,20 +450,30 @@ export default function QRCodesPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleDownloadQR(previewQR)}
-                className="btn btn-primary btn-sm w-full"
-              >
-                <Download className="w-4 h-4" />
-                Download
-              </button>
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleDownloadQR(previewQR)}
+                  className="btn btn-primary btn-sm w-full font-bold flex items-center justify-center gap-1.5"
+                >
+                  <Download className="w-4 h-4" />
+                  Download PNG
+                </button>
+                <button
+                  onClick={() => handleDownloadPDF(previewQR)}
+                  className="btn btn-secondary btn-sm w-full font-bold flex items-center justify-center gap-1.5 border border-slate-200"
+                >
+                  <Download className="w-4 h-4 text-purple-600" />
+                  PDF Badge
+                </button>
+              </div>
+
               <button
                 onClick={() => handlePrintQR(previewQR)}
-                className="btn btn-secondary btn-sm w-full"
+                className="btn btn-ghost btn-sm w-full text-slate-600 hover:text-slate-900 border border-slate-200"
               >
-                <Printer className="w-4 h-4" />
-                Print
+                <Printer className="w-4 h-4 mr-1.5" />
+                Print Sticker / Poster
               </button>
             </div>
           </div>
@@ -372,12 +487,14 @@ export default function QRCodesPage() {
 function QRCard({
   qr,
   onPreview,
+  onDownload,
   onEdit,
   onToggleStatus,
   onPrint,
 }: {
   qr: QRCodeRow
   onPreview: () => void
+  onDownload: (dataUrl?: string) => void
   onEdit: () => void
   onToggleStatus: () => void
   onPrint: () => void
@@ -435,22 +552,22 @@ function QRCard({
       <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1">
           <button
-            onClick={onPreview}
-            className="btn btn-ghost btn-sm p-2 text-slate-600 hover:text-blue-600"
-            title="Download QR"
+            onClick={() => onDownload(dataUrl)}
+            className="btn btn-ghost btn-sm p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
+            title="Download QR Image"
           >
             <Download className="w-4 h-4" />
           </button>
           <button
             onClick={onPrint}
-            className="btn btn-ghost btn-sm p-2 text-slate-600 hover:text-blue-600"
+            className="btn btn-ghost btn-sm p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
             title="Print QR"
           >
             <Printer className="w-4 h-4" />
           </button>
           <button
             onClick={onEdit}
-            className="btn btn-ghost btn-sm p-2 text-slate-600 hover:text-blue-600"
+            className="btn btn-ghost btn-sm p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
             title="Edit QR"
           >
             <Edit2 className="w-4 h-4" />

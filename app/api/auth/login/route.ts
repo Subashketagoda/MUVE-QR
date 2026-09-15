@@ -3,12 +3,21 @@ import { supabase } from '@/lib/supabase/client'
 import { INITIAL_USERS, INITIAL_AUDIT_LOGS } from '@/lib/demo-store'
 import { nanoid } from 'nanoid'
 
+function cleanPhone(val: string): string {
+  return (val || '').replace(/[\s\-\(\)\.]/g, '')
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { email, password } = await req.json()
+    const body = await req.json()
+    const rawIdentifier = (body.phone || body.email || body.identifier || '').trim()
+    const { password } = body
 
-    if (!email || !password) {
-      return NextResponse.json({ success: false, message: 'Email and password required' }, { status: 400 })
+    if (!rawIdentifier || !password) {
+      return NextResponse.json(
+        { success: false, message: 'Phone number and password are required' },
+        { status: 400 }
+      )
     }
 
     const isSupabaseConfigured =
@@ -16,7 +25,14 @@ export async function POST(req: NextRequest) {
       !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
 
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      const emailToUse = rawIdentifier.includes('@')
+        ? rawIdentifier
+        : `${cleanPhone(rawIdentifier)}@muveqr.app`
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailToUse,
+        password,
+      })
 
       if (error) {
         return NextResponse.json({ success: false, message: error.message }, { status: 401 })
@@ -32,17 +48,37 @@ export async function POST(req: NextRequest) {
         success: true,
         user: {
           id: data.user.id,
+          phone: profile?.phone || rawIdentifier,
           email: data.user.email,
           role: profile?.role || 'user',
-          full_name: profile?.full_name || data.user.email,
+          full_name: profile?.full_name || 'User',
         },
       })
     }
 
-    const demoUser = INITIAL_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase())
+    // Match by phone number (with fallback to email if entered)
+    const inputDigits = cleanPhone(rawIdentifier)
+    const inputLower = rawIdentifier.toLowerCase()
+
+    const demoUser = INITIAL_USERS.find((u) => {
+      const uDigits = cleanPhone(u.phone || '')
+      const uEmail = (u.email || '').toLowerCase()
+
+      const phoneMatch =
+        inputDigits &&
+        uDigits &&
+        (uDigits === inputDigits ||
+          uDigits.endsWith(inputDigits) ||
+          inputDigits.endsWith(uDigits))
+
+      const emailMatch = uEmail === inputLower
+
+      return phoneMatch || emailMatch
+    })
+
     if (!demoUser) {
       return NextResponse.json(
-        { success: false, message: 'Invalid credentials. User not found in demo environment.' },
+        { success: false, message: 'Invalid phone number or password. User not found.' },
         { status: 401 }
       )
     }
@@ -63,7 +99,7 @@ export async function POST(req: NextRequest) {
         target_type: 'auth',
         target_id: demoUser.id,
         target_name: demoUser.full_name,
-        details: { email: demoUser.email },
+        details: { phone: demoUser.phone, email: demoUser.email },
         ip_address: '127.0.0.1',
         created_at: new Date().toISOString(),
       })
@@ -73,6 +109,7 @@ export async function POST(req: NextRequest) {
       success: true,
       user: {
         id: demoUser.id,
+        phone: demoUser.phone,
         email: demoUser.email,
         role: demoUser.role,
         full_name: demoUser.full_name,

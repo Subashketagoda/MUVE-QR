@@ -62,7 +62,10 @@ export default function UserHomePage() {
         <div>
           <p className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Welcome Back</p>
           <h2 className="text-2xl font-bold text-white mt-0.5">{user?.full_name || 'User 01'}</h2>
-          <p className="text-xs text-slate-300 mt-1">{user?.email || 'user01@muveqr.app'}</p>
+          <p className="text-xs text-slate-300 mt-1 flex items-center gap-1.5 font-medium">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+            {user?.phone || '077 111 1111'}
+          </p>
         </div>
       </div>
 

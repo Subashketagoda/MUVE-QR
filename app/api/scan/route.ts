@@ -114,32 +114,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (qr.latitude !== null && qr.longitude !== null && qr.geofence_radius) {
-      if (latitude === undefined || longitude === undefined) {
-        if (isGpsRequired) {
-          return NextResponse.json(
-            { success: false, message: 'GPS location is required for this QR code.' },
-            { status: 400 }
-          )
-        }
-      } else {
-        const dist = getDistanceMeters(
-          latitude,
-          longitude,
-          qr.latitude,
-          qr.longitude
-        )
-        if (dist > qr.geofence_radius) {
-          return NextResponse.json(
-            {
-              success: false,
-              message: `You are outside the permitted scanning area. (${Math.round(dist)}m away, limit ${qr.geofence_radius}m)`,
-            },
-            { status: 400 }
-          )
-        }
-      }
-    }
+    // Geofence restriction removed as requested: scans are permitted from any location.
+    // Location coordinates (if available) will still be recorded for audit and tracking.
 
     if (cooldownMinutes > 0) {
       const cooldownMs = cooldownMinutes * 60 * 1000

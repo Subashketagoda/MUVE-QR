@@ -93,10 +93,15 @@ export default function UsersPage() {
       const url = editingUser ? `/api/users/${editingUser.id}` : '/api/users'
       const method = editingUser ? 'PUT' : 'POST'
 
+      const payload = {
+        ...formData,
+        email: formData.email || (formData.phone ? `${formData.phone.replace(/[^0-9]/g, '')}@muveqr.app` : ''),
+      }
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       })
       const json = await res.json()
 
@@ -261,7 +266,7 @@ export default function UsersPage() {
                         </div>
                         <div>
                           <p className="font-semibold text-slate-900">{u.full_name}</p>
-                          <p className="text-[11px] text-slate-400">{u.email}</p>
+                          <p className="text-[11px] font-mono font-medium text-blue-600">{u.phone || u.email}</p>
                         </div>
                       </div>
                     </td>
@@ -367,24 +372,24 @@ export default function UsersPage() {
               </div>
 
               <div>
-                <label className="form-label">Email Address</label>
+                <label className="form-label">Phone Number (Required for Login)</label>
                 <input
-                  type="email"
+                  type="tel"
                   required
-                  placeholder="john@organization.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="e.g. 077 111 1111"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="form-input"
                 />
               </div>
 
               <div>
-                <label className="form-label">Phone Number (Optional)</label>
+                <label className="form-label">Email Address (Optional)</label>
                 <input
-                  type="tel"
-                  placeholder="+1-555-0199"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  type="email"
+                  placeholder="john@organization.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="form-input"
                 />
               </div>

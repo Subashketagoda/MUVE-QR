@@ -19,8 +19,7 @@ export default function UserProfilePage() {
       setUser({
         id: 'usr_user_001',
         full_name: 'User 01',
-        email: 'user01@muveqr.app',
-        phone: '+1-555-0101',
+        phone: '077 111 1111',
         role: 'user',
         status: 'active',
       })
@@ -66,18 +65,10 @@ export default function UserProfilePage() {
       {/* Details List */}
       <div className="card p-4 space-y-4">
         <div className="flex items-center gap-3 text-xs">
-          <Mail className="w-4 h-4 text-slate-400" />
+          <Phone className="w-4 h-4 text-blue-600" />
           <div className="flex-1">
-            <p className="text-slate-400">Email Address</p>
-            <p className="font-semibold text-slate-800">{user.email}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 text-xs pt-3 border-t border-slate-100">
-          <Phone className="w-4 h-4 text-slate-400" />
-          <div className="flex-1">
-            <p className="text-slate-400">Phone Number</p>
-            <p className="font-semibold text-slate-800">{user.phone || '+1-555-0101'}</p>
+            <p className="text-slate-400">Mobile Phone Number</p>
+            <p className="font-bold text-slate-900 text-sm">{user.phone || '077 111 1111'}</p>
           </div>
         </div>
 

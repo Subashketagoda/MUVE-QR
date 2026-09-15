@@ -31,9 +31,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { full_name, email, phone, role = 'user', status = 'active', password } = body
 
-    if (!full_name || !email) {
+    const userPhone = (phone || '').trim()
+    const userEmail = (email || (userPhone ? `${userPhone.replace(/[^0-9]/g, '')}@muveqr.app` : '')).trim()
+
+    if (!full_name || (!userPhone && !email)) {
       return NextResponse.json(
-        { success: false, message: 'Full Name and Email are required' },
+        { success: false, message: 'Full Name and Phone Number are required' },
         { status: 400 }
       )
     }
@@ -44,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     if (isSupabaseConfigured) {
       const { data: authUser, error: authErr } = await supabaseAdmin.auth.admin.createUser({
-        email,
+        email: userEmail,
         password: password || 'User@123456',
         email_confirm: true,
         user_metadata: { full_name, role },
@@ -82,8 +85,8 @@ export async function POST(req: NextRequest) {
     const newUser: UserRow = {
       id: `usr_${nanoid(10)}`,
       full_name,
-      email,
-      phone: phone || null,
+      email: userEmail,
+      phone: userPhone || null,
       role: role as 'admin' | 'user',
       status: status as 'active' | 'inactive' | 'suspended',
       avatar_url: null,

@@ -201,7 +201,8 @@ body {
 /* ============================================================
    Form Styles
    ============================================================ */
-.form-label {
+.form-label,
+.label {
   display: block;
   font-size: 13px;
   font-weight: 500;
@@ -209,7 +210,8 @@ body {
   margin-bottom: 6px;
 }
 
-.form-input {
+.form-input,
+.input {
   width: 100%;
   padding: 10px 14px;
   border: 1px solid #d1d5db;
@@ -220,11 +222,13 @@ body {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   outline: none;
 }
-.form-input:focus {
+.form-input:focus,
+.input:focus {
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1);
 }
-.form-input::placeholder {
+.form-input::placeholder,
+.input::placeholder {
   color: #9ca3af;
 }
 
@@ -467,8 +471,10 @@ body {
   max-width: 480px;
   margin: 0 auto;
   min-height: 100vh;
+  min-height: 100dvh;
   background: #ffffff;
   position: relative;
+  box-shadow: 0 0 50px -10px rgba(0, 0, 0, 0.08);
 }
 
 .bottom-nav {
@@ -478,10 +484,12 @@ body {
   transform: translateX(-50%);
   width: 100%;
   max-width: 480px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid #e2e8f0;
   display: flex;
-  padding: 8px 0 16px;
+  padding: 8px 0 calc(10px + env(safe-area-inset-bottom, 0px));
   z-index: 30;
 }
 
@@ -491,13 +499,14 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 8px 4px;
+  padding: 6px 4px;
   cursor: pointer;
   transition: all 0.15s ease;
   text-decoration: none;
   color: #94a3b8;
   font-size: 11px;
   font-weight: 500;
+  touch-action: manipulation;
 }
 
 .bottom-nav-item.active {
@@ -513,8 +522,8 @@ body {
    ============================================================ */
 .scanner-frame {
   position: relative;
-  width: 260px;
-  height: 260px;
+  width: min(260px, 72vw);
+  height: min(260px, 72vw);
   margin: 0 auto;
 }
 
