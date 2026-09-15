@@ -21,7 +21,7 @@ import { toast } from 'sonner'
 
 const DEFAULT_QR_CODES: QRCodeRow[] = [
   {
-    id: 'qr_001',
+    id: 'e2b55a08-f8bf-440d-b9c0-5ff9dafc6b1f',
     name: 'QR1',
     token: 'MUVEQR-MainEntrance-xK9mP2nQ8vR3tL7w',
     location_name: 'Main Entrance',
@@ -30,12 +30,12 @@ const DEFAULT_QR_CODES: QRCodeRow[] = [
     latitude: 6.9271,
     longitude: 79.8612,
     geofence_radius: null,
-    created_by: 'usr_admin_001',
+    created_by: '00000000-0000-0000-0000-000000000001',
     created_at: new Date(Date.now() - 25 * 86400000).toISOString(),
     updated_at: new Date().toISOString(),
   },
   {
-    id: 'qr_002',
+    id: '33fba264-73c7-47b4-a28b-57ee84b0be5e',
     name: 'QR2',
     token: 'MUVEQR-Office-yJ4nM6pS1uW5eA8d',
     location_name: 'Office',
@@ -44,12 +44,12 @@ const DEFAULT_QR_CODES: QRCodeRow[] = [
     latitude: 6.9275,
     longitude: 79.8615,
     geofence_radius: null,
-    created_by: 'usr_admin_001',
+    created_by: '00000000-0000-0000-0000-000000000001',
     created_at: new Date(Date.now() - 20 * 86400000).toISOString(),
     updated_at: new Date().toISOString(),
   },
   {
-    id: 'qr_003',
+    id: '36ba1b20-eff9-4b50-87df-aafc8b4f3d68',
     name: 'QR3',
     token: 'MUVEQR-Warehouse-zH7kB9qT0iC4fG2x',
     location_name: 'Warehouse',
@@ -58,7 +58,7 @@ const DEFAULT_QR_CODES: QRCodeRow[] = [
     latitude: 6.9280,
     longitude: 79.8620,
     geofence_radius: null,
-    created_by: 'usr_admin_001',
+    created_by: '00000000-0000-0000-0000-000000000001',
     created_at: new Date(Date.now() - 18 * 86400000).toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -95,7 +95,8 @@ export default function QRCodesPage() {
     setLoading(true)
     let localList: QRCodeRow[] = []
     try {
-      localList = JSON.parse(localStorage.getItem('muve_local_qrcodes') || '[]')
+      const raw = JSON.parse(localStorage.getItem('muve_local_qrcodes') || '[]')
+      localList = (raw || []).filter((q: any) => q.id && !q.id.startsWith('qr_'))
       if (localList.length > 0) {
         setQrCodes(localList)
       } else {

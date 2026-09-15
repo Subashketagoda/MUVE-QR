@@ -31,20 +31,53 @@ export async function POST(req: NextRequest) {
       !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
       !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
 
+    const isUUID = (val: string) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val || '')
+
     let targetQR: QRCodeRow | null = null
-    let currentUserId = reqUserId || 'usr_user_001'
+    let currentUserId = reqUserId || '00000000-0000-0000-0000-000000000002'
+    if (currentUserId === 'usr_admin_001') currentUserId = '00000000-0000-0000-0000-000000000001'
+    if (currentUserId === 'usr_user_001') currentUserId = '00000000-0000-0000-0000-000000000002'
+    if (!isUUID(currentUserId)) currentUserId = '00000000-0000-0000-0000-000000000002'
+
     let currentUserName = 'User 01'
     let cooldownMinutes = 5
     let isGpsRequired = false
 
     if (isSupabaseConfigured) {
-      const { data: qrData, error: qrErr } = await (supabaseAdmin as any)
+      let { data: qrData, error: qrErr } = await (supabaseAdmin as any)
         .from('qr_codes')
         .select('*')
         .eq('token', qrToken)
-        .single()
+        .maybeSingle()
 
-      if (!qrErr && qrData) {
+      if (!qrData && isUUID(qrToken)) {
+        const { data: qrById } = await (supabaseAdmin as any)
+          .from('qr_codes')
+          .select('*')
+          .eq('id', qrToken)
+          .maybeSingle()
+        if (qrById) qrData = qrById
+      }
+
+      if (!qrData) {
+        const legacyTokens: Record<string, string> = {
+          qr_001: 'MUVEQR-MainEntrance-xK9mP2nQ8vR3tL7w',
+          qr_002: 'MUVEQR-Office-yJ4nM6pS1uW5eA8d',
+          qr_003: 'MUVEQR-Warehouse-zH7kB9qT0iC4fG2x',
+        }
+        const fallbackToken = legacyTokens[qrToken]
+        if (fallbackToken) {
+          const { data: q } = await (supabaseAdmin as any)
+            .from('qr_codes')
+            .select('*')
+            .eq('token', fallbackToken)
+            .maybeSingle()
+          if (q) qrData = q
+        }
+      }
+
+      if (qrData) {
         targetQR = qrData
       }
 
@@ -56,20 +89,22 @@ export async function POST(req: NextRequest) {
         if (gpsSetting?.value) isGpsRequired = gpsSetting.value === 'true'
       }
 
-      const { data: userData } = await (supabaseAdmin as any)
-        .from('users')
-        .select('full_name, status')
-        .eq('id', currentUserId)
-        .single()
+      if (isUUID(currentUserId)) {
+        const { data: userData } = await (supabaseAdmin as any)
+          .from('users')
+          .select('full_name, status')
+          .eq('id', currentUserId)
+          .maybeSingle()
 
-      if (userData) {
-        if (userData.status !== 'active') {
-          return NextResponse.json(
-            { success: false, message: `Account is ${userData.status}. Scanning disabled.` },
-            { status: 403 }
-          )
+        if (userData) {
+          if (userData.status !== 'active') {
+            return NextResponse.json(
+              { success: false, message: `Account is ${userData.status}. Scanning disabled.` },
+              { status: 403 }
+            )
+          }
+          currentUserName = userData.full_name
         }
-        currentUserName = userData.full_name
       }
     } else {
       targetQR = INITIAL_QR_CODES.find((q) => q.token === qrToken) || null
@@ -155,8 +190,6 @@ export async function POST(req: NextRequest) {
     }
 
     const scanTimestamp = new Date().toISOString()
-    const isUUID = (val: string) =>
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val || '')
 
     let finalUserId = currentUserId
     let finalQrId = qr.id

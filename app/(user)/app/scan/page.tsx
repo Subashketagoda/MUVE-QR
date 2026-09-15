@@ -250,19 +250,19 @@ export default function UserScanPage() {
   const loadAvailableCodes = useCallback(async () => {
     const DEFAULT_CHECKPOINTS = [
       {
-        id: 'qr_001',
+        id: 'e2b55a08-f8bf-440d-b9c0-5ff9dafc6b1f',
         name: 'QR1',
         token: 'MUVEQR-MainEntrance-xK9mP2nQ8vR3tL7w',
         location_name: 'Main Entrance',
       },
       {
-        id: 'qr_002',
+        id: '33fba264-73c7-47b4-a28b-57ee84b0be5e',
         name: 'QR2',
         token: 'MUVEQR-Office-yJ4nM6pS1uW5eA8d',
         location_name: 'Office',
       },
       {
-        id: 'qr_003',
+        id: '36ba1b20-eff9-4b50-87df-aafc8b4f3d68',
         name: 'QR3',
         token: 'MUVEQR-Warehouse-zH7kB9qT0iC4fG2x',
         location_name: 'Warehouse',
@@ -271,7 +271,8 @@ export default function UserScanPage() {
 
     let list = DEFAULT_CHECKPOINTS
     try {
-      const local = JSON.parse(localStorage.getItem('muve_local_qrcodes') || '[]')
+      const raw = JSON.parse(localStorage.getItem('muve_local_qrcodes') || '[]')
+      const local = (raw || []).filter((q: any) => q.id && !q.id.startsWith('qr_'))
       if (local && local.length > 0) {
         const map = new Map()
         DEFAULT_CHECKPOINTS.forEach((c) => map.set(c.id, c))
