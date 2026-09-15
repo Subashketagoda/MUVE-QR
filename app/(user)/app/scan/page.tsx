@@ -314,10 +314,11 @@ export default function UserScanPage() {
 
     // Get logged in user from localStorage
     const saved = localStorage.getItem('muve_user')
-    let userId = 'usr_user_001'
+    let userId = '00000000-0000-0000-0000-000000000002'
     if (saved) {
       try {
-        userId = JSON.parse(saved).id
+        const parsed = JSON.parse(saved)
+        userId = (parsed.id === 'usr_user_001' || !parsed.id) ? '00000000-0000-0000-0000-000000000002' : parsed.id
       } catch (e) {}
     }
 
@@ -434,18 +435,21 @@ export default function UserScanPage() {
   }
 
   return (
-    <div className="p-4 space-y-4 max-w-lg mx-auto select-none">
+    <div
+      className="p-4 space-y-3.5 max-w-lg mx-auto select-none"
+      style={{ paddingTop: 'max(calc(env(safe-area-inset-top, 0px) + 0.5rem), 2.75rem)' }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between pt-1">
+      <div className="flex items-center justify-between">
         <Link
           href="/app/home"
-          className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center text-slate-700 active:scale-95 transition"
+          className="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center text-slate-700 active:scale-95 transition hover:bg-slate-50"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-5 h-5" />
         </Link>
-        <div className="text-center flex-1 pr-9">
-          <h2 className="text-lg font-black text-slate-900 tracking-tight">Scan QR Code</h2>
-          <p className="text-[11px] text-slate-500 font-medium">Position code inside viewfinder</p>
+        <div className="text-center flex-1 pr-10">
+          <h2 className="text-xl font-black text-slate-900 tracking-tight">Scan QR Code</h2>
+          <p className="text-xs text-slate-500 font-medium">Position code inside viewfinder</p>
         </div>
       </div>
 
@@ -625,61 +629,61 @@ export default function UserScanPage() {
 
         {/* Camera Controls Floating Toolbar (Flip Camera, Torch, Restart, View Codes) */}
         {!scanResult && !scanError && (
-          <div className="flex items-center justify-between mt-3 px-1">
-            <div className="flex items-center gap-2">
+          <div className="grid grid-cols-4 gap-1.5 mt-2.5">
+            <button
+              type="button"
+              onClick={() => startScanner()}
+              disabled={cameraLoading}
+              className="btn btn-secondary btn-sm py-2 px-1 rounded-xl text-[11px] font-semibold flex flex-col sm:flex-row items-center justify-center gap-1 shadow-xs hover:bg-slate-100"
+              title="Restart Camera"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${cameraLoading ? 'animate-spin' : ''}`} />
+              <span className="truncate">Reload</span>
+            </button>
+
+            {cameras.length > 1 ? (
               <button
                 type="button"
-                onClick={() => startScanner()}
+                onClick={handleSwitchCamera}
                 disabled={cameraLoading}
-                className="btn btn-secondary btn-sm rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs"
-                title="Restart Camera"
+                className="btn btn-secondary btn-sm py-2 px-1 rounded-xl text-[11px] font-semibold flex flex-col sm:flex-row items-center justify-center gap-1 shadow-xs hover:bg-slate-100"
+                title="Switch Camera (Front/Rear)"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${cameraLoading ? 'animate-spin' : ''}`} />
-                <span>Reload</span>
+                <SwitchCamera className="w-3.5 h-3.5 text-blue-600" />
+                <span className="truncate">Switch</span>
               </button>
+            ) : (
+              <div className="invisible" />
+            )}
 
-              {cameras.length > 1 && (
-                <button
-                  type="button"
-                  onClick={handleSwitchCamera}
-                  disabled={cameraLoading}
-                  className="btn btn-secondary btn-sm rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs"
-                  title="Switch Camera (Front/Rear)"
-                >
-                  <SwitchCamera className="w-3.5 h-3.5" />
-                  <span>Switch Lens</span>
-                </button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              {hasTorch && (
-                <button
-                  type="button"
-                  onClick={handleToggleTorch}
-                  className={`btn btn-sm rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs ${
-                    torchOn ? 'bg-amber-400 text-black hover:bg-amber-300' : 'btn-secondary'
-                  }`}
-                  title="Toggle Torch/Flash"
-                >
-                  {torchOn ? <Flashlight className="w-3.5 h-3.5" /> : <FlashlightOff className="w-3.5 h-3.5" />}
-                  <span>{torchOn ? 'Flash On' : 'Flash'}</span>
-                </button>
-              )}
-
+            {hasTorch ? (
               <button
                 type="button"
-                onClick={() => {
-                  loadAvailableCodes()
-                  setShowCodesModal(true)
-                }}
-                className="btn btn-secondary btn-sm rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs bg-[#072B3B] text-white hover:bg-[#072B3B]/90"
-                title="View available checkpoint QR Codes"
+                onClick={handleToggleTorch}
+                className={`btn btn-sm py-2 px-1 rounded-xl text-[11px] font-semibold flex flex-col sm:flex-row items-center justify-center gap-1 shadow-xs ${
+                  torchOn ? 'bg-amber-400 text-black hover:bg-amber-300' : 'btn-secondary hover:bg-slate-100'
+                }`}
+                title="Toggle Torch/Flash"
               >
-                <QrCode className="w-3.5 h-3.5 text-[#D4FC04]" />
-                <span>View Codes</span>
+                {torchOn ? <Flashlight className="w-3.5 h-3.5" /> : <FlashlightOff className="w-3.5 h-3.5 text-slate-600" />}
+                <span className="truncate">{torchOn ? 'On' : 'Flash'}</span>
               </button>
-            </div>
+            ) : (
+              <div className="invisible" />
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                loadAvailableCodes()
+                setShowCodesModal(true)
+              }}
+              className="btn btn-secondary btn-sm py-2 px-1 rounded-xl text-[11px] font-semibold flex flex-col sm:flex-row items-center justify-center gap-1 shadow-xs bg-[#072B3B] text-white hover:bg-[#072B3B]/90"
+              title="View available checkpoint QR Codes"
+            >
+              <QrCode className="w-3.5 h-3.5 text-[#D4FC04]" />
+              <span className="truncate">Codes</span>
+            </button>
           </div>
         )}
       </div>

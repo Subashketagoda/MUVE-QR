@@ -17,7 +17,10 @@ export const UserBottomNav: React.FC = () => {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
-      <div className="max-w-md mx-auto px-4 pb-3 pt-1 pointer-events-auto">
+      <div
+        className="max-w-md mx-auto px-4 pt-1 pointer-events-auto"
+        style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.75rem)' }}
+      >
         <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] rounded-3xl px-4 h-16 flex items-center justify-around relative">
           {navItems.map((item) => {
             const Icon = item.icon

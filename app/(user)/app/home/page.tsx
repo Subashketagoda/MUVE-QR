@@ -29,10 +29,15 @@ export default function UserHomePage() {
   useEffect(() => {
     // Read logged in user from localStorage
     const saved = localStorage.getItem('muve_user')
-    let currentUsr = { id: 'usr_user_001', full_name: 'User 01', phone: '077 111 1111', role: 'user' }
+    let currentUsr = { id: '00000000-0000-0000-0000-000000000002', full_name: 'User 01', phone: '077 111 1111', role: 'user' }
     if (saved) {
       try {
-        currentUsr = JSON.parse(saved)
+        const parsed = JSON.parse(saved)
+        if (parsed.id === 'usr_user_001') {
+          parsed.id = '00000000-0000-0000-0000-000000000002'
+          localStorage.setItem('muve_user', JSON.stringify(parsed))
+        }
+        currentUsr = parsed
       } catch (e) {}
     }
     setUser(currentUsr)
@@ -54,7 +59,8 @@ export default function UserHomePage() {
     } catch (e) {}
 
     try {
-      const res = await fetch(`/api/scans?userId=${userId}&limit=20`)
+      const targetUserId = (userId === 'usr_user_001' || !userId) ? '00000000-0000-0000-0000-000000000002' : userId
+      const res = await fetch(`/api/scans?userId=${targetUserId}&limit=20`)
       const json = await res.json()
       if (json.success && json.scans) {
         const serverList = json.scans
@@ -85,8 +91,11 @@ export default function UserHomePage() {
 
   return (
     <div className="space-y-5 pb-6">
-      {/* Premium Hero Header */}
-      <div className="bg-gradient-to-b from-[#051824] via-[#072B3B] to-[#0a384d] text-white p-6 pt-7 rounded-b-[32px] shadow-xl relative overflow-hidden">
+      {/* Premium Hero Header with Mobile Status Bar Safe Area */}
+      <div
+        className="bg-gradient-to-b from-[#051824] via-[#072B3B] to-[#0a384d] text-white p-6 rounded-b-[32px] shadow-xl relative overflow-hidden"
+        style={{ paddingTop: 'max(calc(env(safe-area-inset-top, 0px) + 0.85rem), 3rem)' }}
+      >
         {/* Background glow orb */}
         <div className="absolute top-0 right-0 w-48 h-48 bg-[#D4FC04]/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-40 h-40 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />

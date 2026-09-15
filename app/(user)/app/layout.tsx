@@ -20,7 +20,7 @@ export default function UserAppLayout({ children }: { children: React.ReactNode 
         </div>
 
         {/* Scrollable App Viewport */}
-        <main className="flex-1 pb-24 overflow-y-auto scrollbar-none overscroll-contain">
+        <main className="flex-1 pb-28 overflow-y-auto scrollbar-none overscroll-contain">
           {children}
         </main>
 

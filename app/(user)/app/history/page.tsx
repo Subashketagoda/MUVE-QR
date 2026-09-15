@@ -29,10 +29,11 @@ export default function UserHistoryPage() {
   const fetchHistory = async () => {
     setLoading(true)
     const saved = localStorage.getItem('muve_user')
-    let userId = 'usr_user_001'
+    let userId = '00000000-0000-0000-0000-000000000002'
     if (saved) {
       try {
-        userId = JSON.parse(saved).id
+        const parsed = JSON.parse(saved)
+        userId = (parsed.id === 'usr_user_001' || !parsed.id) ? '00000000-0000-0000-0000-000000000002' : parsed.id
       } catch (e) {}
     }
 
@@ -70,9 +71,12 @@ export default function UserHistoryPage() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div
+      className="p-4 space-y-4"
+      style={{ paddingTop: 'max(calc(env(safe-area-inset-top, 0px) + 0.5rem), 2.75rem)' }}
+    >
       {/* Top Header */}
-      <div className="flex items-center justify-between pt-1">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <Link
             href="/app/home"

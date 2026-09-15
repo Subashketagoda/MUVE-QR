@@ -56,9 +56,12 @@ export default function UserProfilePage() {
   if (!user) return null
 
   return (
-    <div className="p-4 space-y-5">
+    <div
+      className="p-4 space-y-5"
+      style={{ paddingTop: 'max(calc(env(safe-area-inset-top, 0px) + 0.5rem), 2.75rem)' }}
+    >
       {/* Top Header */}
-      <div className="flex items-center gap-2.5 pt-1">
+      <div className="flex items-center gap-2.5">
         <Link
           href="/app/home"
           className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center text-slate-700 active:scale-95 transition"
