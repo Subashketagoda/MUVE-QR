@@ -45,11 +45,55 @@ export async function POST(req: NextRequest) {
 
     const sanitizeLoc = location_name.replace(/[^a-zA-Z0-9]/g, '')
     const token = `MUVEQR-${sanitizeLoc}-${nanoid(16)}`
-    const qrId = `qr_${nanoid(10)}`
     const now = new Date().toISOString()
+    const adminUuid = '00000000-0000-0000-0000-000000000001'
+    const qrUuid = crypto.randomUUID()
+
+    const isSupabaseConfigured =
+      !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+
+    if (isSupabaseConfigured) {
+      const { data, error } = await (supabaseAdmin as any)
+        .from('qr_codes')
+        .insert({
+          id: qrUuid,
+          name,
+          token,
+          location_name,
+          description: description || null,
+          status: status as 'active' | 'inactive' | 'archived',
+          latitude: latitude ? parseFloat(latitude) : null,
+          longitude: longitude ? parseFloat(longitude) : null,
+          geofence_radius: geofence_radius ? parseInt(geofence_radius, 10) : null,
+          created_by: adminUuid,
+          created_at: now,
+          updated_at: now,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      try {
+        await (supabaseAdmin as any).from('audit_logs').insert({
+          admin_id: adminUuid,
+          admin_name: 'System Admin',
+          action: 'qr_created',
+          target_type: 'qr_code',
+          target_id: data.id,
+          target_name: name,
+          details: { location: location_name, token },
+        })
+      } catch (auditErr) {
+        console.warn('Audit log skip:', auditErr)
+      }
+
+      return NextResponse.json({ success: true, qrCode: data })
+    }
 
     const newQR: QRCodeRow = {
-      id: qrId,
+      id: `qr_${nanoid(10)}`,
       name,
       token,
       location_name,
@@ -61,26 +105,6 @@ export async function POST(req: NextRequest) {
       created_by: 'usr_admin_001',
       created_at: now,
       updated_at: now,
-    }
-
-    const isSupabaseConfigured =
-      !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
-
-    if (isSupabaseConfigured) {
-      const { data, error } = await (supabaseAdmin as any).from('qr_codes').insert(newQR).select().single()
-      if (error) throw error
-
-      await (supabaseAdmin as any).from('audit_logs').insert({
-        admin_name: 'System Admin',
-        action: 'qr_created',
-        target_type: 'qr_code',
-        target_id: data.id,
-        target_name: name,
-        details: { location: location_name, token },
-      })
-
-      return NextResponse.json({ success: true, qrCode: data })
     }
 
     INITIAL_QR_CODES.unshift(newQR)

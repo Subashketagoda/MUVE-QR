@@ -40,13 +40,16 @@ export async function PUT(req: NextRequest) {
           .upsert({ key, value: String(value), updated_at: new Date().toISOString() }, { onConflict: 'key' })
       }
 
-      await (supabaseAdmin as any).from('audit_logs').insert({
-        admin_name: 'System Admin',
-        action: 'settings_changed',
-        target_type: 'setting',
-        target_name: 'Organization Settings',
-        details: body,
-      })
+      try {
+        await (supabaseAdmin as any).from('audit_logs').insert({
+          admin_id: '00000000-0000-0000-0000-000000000001',
+          admin_name: 'System Admin',
+          action: 'settings_changed',
+          target_type: 'setting',
+          target_name: 'Organization Settings',
+          details: body,
+        })
+      } catch (e) {}
 
       return NextResponse.json({ success: true, message: 'Settings updated' })
     }

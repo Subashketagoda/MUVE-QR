@@ -69,14 +69,17 @@ export async function POST(req: NextRequest) {
 
       if (error) throw error
 
-      await (supabaseAdmin as any).from('audit_logs').insert({
-        admin_name: 'System Admin',
-        action: 'user_created',
-        target_type: 'user',
-        target_id: data.id,
-        target_name: full_name,
-        details: { email, role, status },
-      })
+      try {
+        await (supabaseAdmin as any).from('audit_logs').insert({
+          admin_id: '00000000-0000-0000-0000-000000000001',
+          admin_name: 'System Admin',
+          action: 'user_created',
+          target_type: 'user',
+          target_id: data.id,
+          target_name: full_name,
+          details: { email, role, status },
+        })
+      } catch (e) {}
 
       return NextResponse.json({ success: true, user: data })
     }

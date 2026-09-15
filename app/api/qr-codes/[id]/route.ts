@@ -34,14 +34,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
       if (error) throw error
 
-      await (supabaseAdmin as any).from('audit_logs').insert({
-        admin_name: 'System Admin',
-        action: status ? `qr_${status}` : 'qr_edited',
-        target_type: 'qr_code',
-        target_id: id,
-        target_name: data.name,
-        details: updatePayload,
-      })
+      try {
+        await (supabaseAdmin as any).from('audit_logs').insert({
+          admin_id: '00000000-0000-0000-0000-000000000001',
+          admin_name: 'System Admin',
+          action: status ? `qr_${status}` : 'qr_edited',
+          target_type: 'qr_code',
+          target_id: id,
+          target_name: data.name,
+          details: updatePayload,
+        })
+      } catch (e) {}
 
       return NextResponse.json({ success: true, qrCode: data })
     }
