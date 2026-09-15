@@ -34,6 +34,13 @@ export async function POST(req: NextRequest) {
     const isUUID = (val: string) =>
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val || '')
 
+    // Extract clean token if a full URL was scanned
+    let cleanToken = (qrToken || '').trim()
+    if (cleanToken.includes('/')) {
+      const parts = cleanToken.split('/')
+      cleanToken = parts[parts.length - 1].split('?')[0].trim()
+    }
+
     let targetQR: QRCodeRow | null = null
     let currentUserId = reqUserId || '00000000-0000-0000-0000-000000000002'
     if (currentUserId === 'usr_admin_001') currentUserId = '00000000-0000-0000-0000-000000000001'
@@ -41,40 +48,78 @@ export async function POST(req: NextRequest) {
     if (!isUUID(currentUserId)) currentUserId = '00000000-0000-0000-0000-000000000002'
 
     let currentUserName = 'User 01'
-    let cooldownMinutes = 5
+    let cooldownMinutes = 0
     let isGpsRequired = false
 
     if (isSupabaseConfigured) {
-      let { data: qrData, error: qrErr } = await (supabaseAdmin as any)
+      let qrData: any = null
+
+      // Strategy 1: Match by cleanToken
+      const { data: d1 } = await (supabaseAdmin as any)
         .from('qr_codes')
         .select('*')
-        .eq('token', qrToken)
+        .eq('token', cleanToken)
         .maybeSingle()
+      if (d1) qrData = d1
 
-      if (!qrData && isUUID(qrToken)) {
-        const { data: qrById } = await (supabaseAdmin as any)
+      // Strategy 2: Match by raw qrToken
+      if (!qrData && cleanToken !== qrToken.trim()) {
+        const { data: d2 } = await (supabaseAdmin as any)
           .from('qr_codes')
           .select('*')
-          .eq('id', qrToken)
+          .eq('token', qrToken.trim())
           .maybeSingle()
-        if (qrById) qrData = qrById
+        if (d2) qrData = d2
       }
 
+      // Strategy 3: Match by ID if cleanToken is UUID
+      if (!qrData && isUUID(cleanToken)) {
+        const { data: d3 } = await (supabaseAdmin as any)
+          .from('qr_codes')
+          .select('*')
+          .eq('id', cleanToken)
+          .maybeSingle()
+        if (d3) qrData = d3
+      }
+
+      // Strategy 4: Legacy token map
       if (!qrData) {
         const legacyTokens: Record<string, string> = {
           qr_001: 'MUVEQR-MainEntrance-xK9mP2nQ8vR3tL7w',
           qr_002: 'MUVEQR-Office-yJ4nM6pS1uW5eA8d',
           qr_003: 'MUVEQR-Warehouse-zH7kB9qT0iC4fG2x',
         }
-        const fallbackToken = legacyTokens[qrToken]
+        const fallbackToken = legacyTokens[cleanToken] || legacyTokens[cleanToken.toLowerCase()]
         if (fallbackToken) {
-          const { data: q } = await (supabaseAdmin as any)
+          const { data: d4 } = await (supabaseAdmin as any)
             .from('qr_codes')
             .select('*')
             .eq('token', fallbackToken)
             .maybeSingle()
-          if (q) qrData = q
+          if (d4) qrData = d4
         }
+      }
+
+      // Strategy 5: Partial token matching
+      if (!qrData && cleanToken.startsWith('MUVEQR-')) {
+        const { data: d5 } = await (supabaseAdmin as any)
+          .from('qr_codes')
+          .select('*')
+          .ilike('token', `%${cleanToken}%`)
+          .limit(1)
+          .maybeSingle()
+        if (d5) qrData = d5
+      }
+
+      // Strategy 6: Name matching (e.g. "QR1", "QR2", "Office")
+      if (!qrData) {
+        const { data: d6 } = await (supabaseAdmin as any)
+          .from('qr_codes')
+          .select('*')
+          .ilike('name', cleanToken)
+          .limit(1)
+          .maybeSingle()
+        if (d6) qrData = d6
       }
 
       if (qrData) {

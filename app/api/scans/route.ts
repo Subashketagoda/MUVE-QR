@@ -18,11 +18,7 @@ export async function GET(req: NextRequest) {
     if (isSupabaseConfigured) {
       let query = supabaseAdmin
         .from('scan_logs')
-        .select(`
-          *,
-          users ( full_name, email ),
-          qr_codes ( name, location_name )
-        `)
+        .select('*')
         .order('scanned_at', { ascending: false })
         .limit(limit)
 
@@ -36,15 +32,35 @@ export async function GET(req: NextRequest) {
       }
 
       const { data, error } = await query
-        .order('scanned_at', { ascending: false })
-
       if (error) throw error
 
-      // Enrich with user full name if available
+      // Enrich with user names safely without foreign key join
+      const userIds = Array.from(new Set((data || []).map((d: any) => d.user_id).filter(Boolean)))
+      const userMap: Record<string, { full_name: string; email: string }> = {}
+      if (userIds.length > 0) {
+        try {
+          const { data: uData } = await (supabaseAdmin as any)
+            .from('users')
+            .select('id, full_name, email')
+            .in('id', userIds)
+          if (uData) {
+            uData.forEach((u: any) => {
+              userMap[u.id] = { full_name: u.full_name, email: u.email }
+            })
+          }
+        } catch (e) {}
+      }
+
       const enriched = (data || []).map((item: any) => ({
         ...item,
-        user_name: item.users?.full_name || 'User ' + item.user_id.slice(-4),
-        user_email: item.users?.email || '',
+        user_name:
+          userMap[item.user_id]?.full_name ||
+          (item.user_id === '00000000-0000-0000-0000-000000000001'
+            ? 'System Admin'
+            : item.user_id === '00000000-0000-0000-0000-000000000002'
+            ? 'User 01'
+            : 'User ' + (item.user_id ? item.user_id.slice(-4) : '')),
+        user_email: userMap[item.user_id]?.email || '',
       }))
 
       return NextResponse.json({ success: true, scans: enriched })
