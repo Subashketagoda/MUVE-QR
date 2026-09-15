@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Logo } from '@/components/shared/Logo'
 import { toast } from 'sonner'
-import { LogIn, ArrowRight, Phone, Lock, Sparkles } from 'lucide-react'
+import { LogIn, ArrowRight, Phone, Lock } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -43,11 +43,6 @@ export default function LoginPage() {
       toast.error('Network error during login')
       setLoading(false)
     }
-  }
-
-  const fillQuickLogin = (p: string, pass: string) => {
-    setPhone(p)
-    setPassword(pass)
   }
 
   return (
@@ -126,32 +121,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Credentials shortcuts */}
-          <div className="mt-6 pt-4 border-t border-slate-100">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-blue-500" />
-              Quick Demo Fill
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => fillQuickLogin('0771111111', 'password123')}
-                className="p-2 bg-slate-50 hover:bg-blue-50 border border-slate-200 rounded-xl text-left transition cursor-pointer"
-              >
-                <span className="font-bold text-xs text-slate-800 block">User 01</span>
-                <span className="text-[10px] text-slate-500 font-mono">077 111 1111</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillQuickLogin('0770000001', 'admin123')}
-                className="p-2 bg-slate-50 hover:bg-blue-50 border border-slate-200 rounded-xl text-left transition cursor-pointer"
-              >
-                <span className="font-bold text-xs text-slate-800 block">Admin</span>
-                <span className="text-[10px] text-slate-500 font-mono">077 000 0001</span>
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
