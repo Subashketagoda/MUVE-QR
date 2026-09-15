@@ -305,6 +305,21 @@ export default function UserScanPage() {
 
       setScanResult(json.scan)
       toast.success('✓ Scan Recorded!')
+
+      // Persist in localStorage so scans survive server updates
+      try {
+        const localScans = JSON.parse(localStorage.getItem('muve_local_scans') || '[]')
+        const scanItem = {
+          id: json.scan.id,
+          qr_name: json.scan.qr,
+          location_name: json.scan.location,
+          scanned_at: json.scan.timestamp,
+          status: 'success',
+          user_id: userId,
+        }
+        const merged = [scanItem, ...localScans.filter((s: any) => s.id !== scanItem.id)].slice(0, 100)
+        localStorage.setItem('muve_local_scans', JSON.stringify(merged))
+      } catch (e) {}
     } catch (err: any) {
       setScanError('Network connection error while recording scan')
     } finally {

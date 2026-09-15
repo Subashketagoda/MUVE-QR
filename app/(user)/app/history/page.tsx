@@ -22,17 +22,36 @@ export default function UserHistoryPage() {
       } catch (e) {}
     }
 
+    let localList: any[] = []
+    try {
+      localList = JSON.parse(localStorage.getItem('muve_local_scans') || '[]')
+      if (localList.length > 0) {
+        let list = localList
+        if (selectedDate) {
+          list = list.filter((s: any) => s.scanned_at.split('T')[0] === selectedDate)
+        }
+        setScans(list)
+      }
+    } catch (e) {}
+
     try {
       const res = await fetch(`/api/scans?userId=${userId}&limit=100`)
       const json = await res.json()
       if (json.success && json.scans) {
-        let list = json.scans
+        const serverList = json.scans
+        const map = new Map()
+        localList.forEach((s: any) => map.set(s.id, s))
+        serverList.forEach((s: any) => map.set(s.id, s))
+        let combined = Array.from(map.values()).sort(
+          (a: any, b: any) => new Date(b.scanned_at).getTime() - new Date(a.scanned_at).getTime()
+        )
+
         if (selectedDate) {
-          list = list.filter(
+          combined = combined.filter(
             (s: any) => s.scanned_at.split('T')[0] === selectedDate
           )
         }
-        setScans(list)
+        setScans(combined)
       }
     } catch (e) {
       console.error(e)

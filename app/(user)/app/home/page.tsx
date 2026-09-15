@@ -27,21 +27,41 @@ export default function UserHomePage() {
   }, [])
 
   const fetchUserScans = async (userId: string) => {
+    let localList: any[] = []
+    try {
+      localList = JSON.parse(localStorage.getItem('muve_local_scans') || '[]')
+      if (localList.length > 0) {
+        setRecentScans(localList.slice(0, 5))
+        setLastScan(localList[0])
+        const todayStart = new Date()
+        todayStart.setHours(0, 0, 0, 0)
+        const count = localList.filter((s: any) => new Date(s.scanned_at) >= todayStart).length
+        setScansToday(count)
+      }
+    } catch (e) {}
+
     try {
       const res = await fetch(`/api/scans?userId=${userId}&limit=20`)
       const json = await res.json()
       if (json.success && json.scans) {
-        const list = json.scans
-        setRecentScans(list.slice(0, 5))
+        const serverList = json.scans
+        const map = new Map()
+        localList.forEach((s: any) => map.set(s.id, s))
+        serverList.forEach((s: any) => map.set(s.id, s))
+        const combined = Array.from(map.values()).sort(
+          (a: any, b: any) => new Date(b.scanned_at).getTime() - new Date(a.scanned_at).getTime()
+        )
 
-        if (list.length > 0) {
-          setLastScan(list[0])
+        setRecentScans(combined.slice(0, 5))
+        if (combined.length > 0) {
+          setLastScan(combined[0])
         }
-
         const todayStart = new Date()
         todayStart.setHours(0, 0, 0, 0)
-        const count = list.filter((s: any) => new Date(s.scanned_at) >= todayStart).length
+        const count = combined.filter((s: any) => new Date(s.scanned_at) >= todayStart).length
         setScansToday(count)
+
+        localStorage.setItem('muve_local_scans', JSON.stringify(combined.slice(0, 100)))
       }
     } catch (e) {
       console.error(e)

@@ -47,11 +47,25 @@ export default function QRCodesPage() {
 
   const fetchQRCodes = async () => {
     setLoading(true)
+    let localList: QRCodeRow[] = []
+    try {
+      localList = JSON.parse(localStorage.getItem('muve_local_qrcodes') || '[]')
+      if (localList.length > 0) {
+        setQrCodes(localList)
+      }
+    } catch (e) {}
+
     try {
       const res = await fetch('/api/qr-codes')
       const data = await res.json()
-      if (data.success) {
-        setQrCodes(data.qrCodes)
+      if (data.success && data.qrCodes) {
+        const serverList = data.qrCodes
+        const map = new Map()
+        localList.forEach((q: any) => map.set(q.id, q))
+        serverList.forEach((q: any) => map.set(q.id, q))
+        const combined = Array.from(map.values())
+        setQrCodes(combined)
+        localStorage.setItem('muve_local_qrcodes', JSON.stringify(combined))
       }
     } catch (e) {
       toast.error('Failed to fetch QR codes')
