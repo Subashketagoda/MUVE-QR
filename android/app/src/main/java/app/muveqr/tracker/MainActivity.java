@@ -7,9 +7,11 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -45,6 +47,13 @@ public class MainActivity extends AppCompatActivity {
         // Check and request runtime permissions at startup
         checkAndRequestPermissions();
 
+        // Enable cookies and session persistence
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            cookieManager.setAcceptThirdPartyCookies(webView, true);
+        }
+
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -52,6 +61,8 @@ public class MainActivity extends AppCompatActivity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setAllowFileAccess(true);
         settings.setGeolocationEnabled(true);
+        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(true);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
@@ -111,7 +122,20 @@ public class MainActivity extends AppCompatActivity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                if (request != null && request.getUrl() != null) {
+                    return handleUrl(view, request.getUrl().toString());
+                }
+                return false;
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return handleUrl(view, url);
+            }
+
+            private boolean handleUrl(WebView view, String url) {
+                if (url == null) return false;
                 if (url.endsWith(".apk") || url.contains("/downloads/") || url.contains("/api/reports/export")) {
                     try {
                         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
