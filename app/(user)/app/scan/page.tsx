@@ -18,8 +18,11 @@ import {
   Flashlight,
   FlashlightOff,
   ShieldCheck,
-  AlertTriangle
+  AlertTriangle,
+  QrCode,
+  X,
 } from 'lucide-react'
+import QRCode from 'qrcode'
 import { toast } from 'sonner'
 
 export default function UserScanPage() {
@@ -34,6 +37,11 @@ export default function UserScanPage() {
   const [currentCameraId, setCurrentCameraId] = useState<string | null>(null)
   const [torchOn, setTorchOn] = useState(false)
   const [hasTorch, setHasTorch] = useState(false)
+
+  // Checkpoint codes modal state
+  const [showCodesModal, setShowCodesModal] = useState(false)
+  const [availableQRCodes, setAvailableQRCodes] = useState<any[]>([])
+  const [qrImages, setQrImages] = useState<Record<string, string>>({})
 
   const html5QrcodeRef = useRef<Html5Qrcode | null>(null)
   const isStartingRef = useRef(false)
@@ -238,14 +246,62 @@ export default function UserScanPage() {
     }
   }
 
+  // Load available checkpoint codes
+  const loadAvailableCodes = useCallback(async () => {
+    const DEFAULT_CHECKPOINTS = [
+      {
+        id: 'qr_001',
+        name: 'QR1',
+        token: 'MUVEQR-MainEntrance-xK9mP2nQ8vR3tL7w',
+        location_name: 'Main Entrance',
+      },
+      {
+        id: 'qr_002',
+        name: 'QR2',
+        token: 'MUVEQR-Office-yJ4nM6pS1uW5eA8d',
+        location_name: 'Office',
+      },
+      {
+        id: 'qr_003',
+        name: 'QR3',
+        token: 'MUVEQR-Warehouse-zH7kB9qT0iC4fG2x',
+        location_name: 'Warehouse',
+      },
+    ]
+
+    let list = DEFAULT_CHECKPOINTS
+    try {
+      const local = JSON.parse(localStorage.getItem('muve_local_qrcodes') || '[]')
+      if (local && local.length > 0) {
+        const map = new Map()
+        DEFAULT_CHECKPOINTS.forEach((c) => map.set(c.id, c))
+        local.forEach((c: any) => map.set(c.id, c))
+        list = Array.from(map.values())
+      }
+    } catch (e) {}
+
+    setAvailableQRCodes(list)
+
+    const images: Record<string, string> = {}
+    for (const item of list) {
+      try {
+        const scanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muveqr.app/scan'}/${item.token}`
+        const url = await QRCode.toDataURL(scanUrl, { width: 300, margin: 2 })
+        images[item.id] = url
+      } catch (e) {}
+    }
+    setQrImages(images)
+  }, [])
+
   // Initial load
   useEffect(() => {
     startScanner()
+    loadAvailableCodes()
 
     return () => {
       stopScanner()
     }
-  }, [])
+  }, [loadAvailableCodes])
 
   // Process scanned QR Token
   const processScanToken = async (qrTokenRaw: string) => {
@@ -517,7 +573,7 @@ export default function UserScanPage() {
           )}
         </div>
 
-        {/* Camera Controls Floating Toolbar (Flip Camera, Torch, Restart) */}
+        {/* Camera Controls Floating Toolbar (Flip Camera, Torch, Restart, View Codes) */}
         {!scanResult && !scanError && (
           <div className="flex items-center justify-between mt-3 px-1">
             <div className="flex items-center gap-2">
@@ -546,22 +602,98 @@ export default function UserScanPage() {
               )}
             </div>
 
-            {hasTorch && (
+            <div className="flex items-center gap-2">
+              {hasTorch && (
+                <button
+                  type="button"
+                  onClick={handleToggleTorch}
+                  className={`btn btn-sm rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs ${
+                    torchOn ? 'bg-amber-400 text-black hover:bg-amber-300' : 'btn-secondary'
+                  }`}
+                  title="Toggle Torch/Flash"
+                >
+                  {torchOn ? <Flashlight className="w-3.5 h-3.5" /> : <FlashlightOff className="w-3.5 h-3.5" />}
+                  <span>{torchOn ? 'Flash On' : 'Flash'}</span>
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={handleToggleTorch}
-                className={`btn btn-sm rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs ${
-                  torchOn ? 'bg-amber-400 text-black hover:bg-amber-300' : 'btn-secondary'
-                }`}
-                title="Toggle Torch/Flash"
+                onClick={() => {
+                  loadAvailableCodes()
+                  setShowCodesModal(true)
+                }}
+                className="btn btn-secondary btn-sm rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs bg-[#072B3B] text-white hover:bg-[#072B3B]/90"
+                title="View available checkpoint QR Codes"
               >
-                {torchOn ? <Flashlight className="w-3.5 h-3.5" /> : <FlashlightOff className="w-3.5 h-3.5" />}
-                <span>{torchOn ? 'Flash On' : 'Flash'}</span>
+                <QrCode className="w-3.5 h-3.5 text-[#D4FC04]" />
+                <span>View Codes</span>
               </button>
-            )}
+            </div>
           </div>
         )}
       </div>
+
+      {/* Checkpoint QR Codes Modal */}
+      {showCodesModal && (
+        <div className="modal-overlay z-30">
+          <div className="modal-content p-5 max-w-sm w-full max-h-[85vh] overflow-y-auto rounded-3xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4 sticky top-0 bg-white z-10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <QrCode className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Checkpoint QR Codes</h3>
+                  <p className="text-[11px] text-slate-400">Available QR checkpoints to scan or test</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCodesModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {availableQRCodes.map((qr) => (
+                <div key={qr.id} className="card p-4 border border-slate-200 text-center space-y-3 bg-slate-50/50">
+                  <div className="flex items-center justify-between">
+                    <span className="badge badge-primary text-xs font-bold">{qr.name}</span>
+                    <span className="text-xs font-semibold text-slate-700">{qr.location_name}</span>
+                  </div>
+
+                  {qrImages[qr.id] ? (
+                    <div className="bg-white p-3 rounded-2xl border border-slate-200 inline-block shadow-sm">
+                      <img src={qrImages[qr.id]} alt={qr.name} className="w-44 h-44 mx-auto" />
+                    </div>
+                  ) : (
+                    <div className="w-44 h-44 bg-slate-100 rounded-2xl mx-auto flex items-center justify-center">
+                      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-slate-400 font-mono break-all">{qr.token}</p>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setShowCodesModal(false)
+                      await stopScanner()
+                      processScanToken(qr.token)
+                    }}
+                    className="w-full btn btn-primary btn-sm rounded-xl font-bold text-xs"
+                  >
+                    Test Scan this Code
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

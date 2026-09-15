@@ -11,18 +11,23 @@ export async function GET(req: NextRequest) {
       !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
 
     if (isSupabaseConfigured) {
-      const { data, error } = await (supabaseAdmin as any)
-        .from('qr_codes')
-        .select('*')
-        .order('created_at', { ascending: false })
+      try {
+        const { data, error } = await (supabaseAdmin as any)
+          .from('qr_codes')
+          .select('*')
+          .order('created_at', { ascending: false })
 
-      if (error) throw error
-      return NextResponse.json({ success: true, qrCodes: data })
+        if (!error && data && data.length > 0) {
+          return NextResponse.json({ success: true, qrCodes: data })
+        }
+      } catch (sbErr) {
+        console.warn('Supabase qr_codes fetch error, using fallback:', sbErr)
+      }
     }
 
     return NextResponse.json({ success: true, qrCodes: INITIAL_QR_CODES })
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err.message }, { status: 500 })
+    return NextResponse.json({ success: true, qrCodes: INITIAL_QR_CODES })
   }
 }
 

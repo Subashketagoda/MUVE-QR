@@ -14,12 +14,58 @@ import {
   X,
   CheckCircle,
   AlertTriangle,
+  RotateCcw,
 } from 'lucide-react'
 import { QRCodeRow } from '@/types/database'
 import { toast } from 'sonner'
 
+const DEFAULT_QR_CODES: QRCodeRow[] = [
+  {
+    id: 'qr_001',
+    name: 'QR1',
+    token: 'MUVEQR-MainEntrance-xK9mP2nQ8vR3tL7w',
+    location_name: 'Main Entrance',
+    description: 'Primary building entrance scanner point',
+    status: 'active',
+    latitude: 6.9271,
+    longitude: 79.8612,
+    geofence_radius: null,
+    created_by: 'usr_admin_001',
+    created_at: new Date(Date.now() - 25 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'qr_002',
+    name: 'QR2',
+    token: 'MUVEQR-Office-yJ4nM6pS1uW5eA8d',
+    location_name: 'Office',
+    description: 'Main executive office area access point',
+    status: 'active',
+    latitude: 6.9275,
+    longitude: 79.8615,
+    geofence_radius: null,
+    created_by: 'usr_admin_001',
+    created_at: new Date(Date.now() - 20 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'qr_003',
+    name: 'QR3',
+    token: 'MUVEQR-Warehouse-zH7kB9qT0iC4fG2x',
+    location_name: 'Warehouse',
+    description: 'Warehouse loading dock entrance checkpoint',
+    status: 'active',
+    latitude: 6.9280,
+    longitude: 79.8620,
+    geofence_radius: null,
+    created_by: 'usr_admin_001',
+    created_at: new Date(Date.now() - 18 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+]
+
 export default function QRCodesPage() {
-  const [qrCodes, setQrCodes] = useState<QRCodeRow[]>([])
+  const [qrCodes, setQrCodes] = useState<QRCodeRow[]>(DEFAULT_QR_CODES)
   const [loading, setLoading] = useState(true)
 
   // Modal State
@@ -52,26 +98,50 @@ export default function QRCodesPage() {
       localList = JSON.parse(localStorage.getItem('muve_local_qrcodes') || '[]')
       if (localList.length > 0) {
         setQrCodes(localList)
+      } else {
+        setQrCodes(DEFAULT_QR_CODES)
       }
-    } catch (e) {}
+    } catch (e) {
+      setQrCodes(DEFAULT_QR_CODES)
+    }
 
     try {
       const res = await fetch('/api/qr-codes')
       const data = await res.json()
-      if (data.success && data.qrCodes) {
-        const serverList = data.qrCodes
-        const map = new Map()
-        localList.forEach((q: any) => map.set(q.id, q))
-        serverList.forEach((q: any) => map.set(q.id, q))
-        const combined = Array.from(map.values())
-        setQrCodes(combined)
-        localStorage.setItem('muve_local_qrcodes', JSON.stringify(combined))
-      }
+      const serverList =
+        data.success && data.qrCodes && data.qrCodes.length > 0
+          ? data.qrCodes
+          : DEFAULT_QR_CODES
+
+      const map = new Map()
+      // Put default demo codes first
+      DEFAULT_QR_CODES.forEach((q: any) => map.set(q.id, q))
+      // Merge local storage codes
+      localList.forEach((q: any) => map.set(q.id, q))
+      // Merge server codes
+      serverList.forEach((q: any) => map.set(q.id, q))
+
+      const combined = Array.from(map.values()) as QRCodeRow[]
+      setQrCodes(combined)
+      localStorage.setItem('muve_local_qrcodes', JSON.stringify(combined))
     } catch (e) {
-      toast.error('Failed to fetch QR codes')
+      if (localList.length === 0) {
+        setQrCodes(DEFAULT_QR_CODES)
+        localStorage.setItem('muve_local_qrcodes', JSON.stringify(DEFAULT_QR_CODES))
+      }
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleRestoreDefaults = () => {
+    const map = new Map()
+    DEFAULT_QR_CODES.forEach((q) => map.set(q.id, q))
+    qrCodes.forEach((q) => map.set(q.id, q))
+    const merged = Array.from(map.values())
+    setQrCodes(merged)
+    localStorage.setItem('muve_local_qrcodes', JSON.stringify(merged))
+    toast.success('Default QR codes restored (QR1, QR2, QR3)')
   }
 
   const handleOpenCreateModal = () => {
@@ -324,10 +394,21 @@ export default function QRCodesPage() {
             Create, edit, activate, and manage location QR codes across your facilities
           </p>
         </div>
-        <button onClick={handleOpenCreateModal} className="btn btn-primary btn-sm">
-          <Plus className="w-4 h-4" />
-          Create QR Code
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleRestoreDefaults}
+            className="btn btn-secondary btn-sm flex items-center gap-1.5"
+            title="Restore default demo QR codes"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Restore Defaults</span>
+          </button>
+          <button onClick={handleOpenCreateModal} className="btn btn-primary btn-sm flex items-center gap-1.5">
+            <Plus className="w-4 h-4" />
+            <span>Create QR Code</span>
+          </button>
+        </div>
       </div>
 
       {/* Grid of QR Code Cards */}
@@ -336,6 +417,28 @@ export default function QRCodesPage() {
           {[...Array(3)].map((_, i) => (
             <div key={i} className="h-64 skeleton rounded-xl" />
           ))}
+        </div>
+      ) : qrCodes.length === 0 ? (
+        <div className="card p-12 text-center max-w-md mx-auto space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+            <QrIcon className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-900 text-lg">No QR Codes Found</h3>
+            <p className="text-slate-500 text-sm mt-1">
+              Restore the default checkpoint codes (QR1, QR2, QR3) or create a new code.
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button onClick={handleRestoreDefaults} className="btn btn-primary btn-sm flex items-center gap-1.5">
+              <RotateCcw className="w-4 h-4" />
+              Restore Defaults
+            </button>
+            <button onClick={handleOpenCreateModal} className="btn btn-secondary btn-sm flex items-center gap-1.5">
+              <Plus className="w-4 h-4" />
+              Create New
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
