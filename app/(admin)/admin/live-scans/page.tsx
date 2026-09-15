@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { Radio, Volume2, VolumeX, ShieldCheck, MapPin, Clock, User, QrCode } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { ScanLogEnriched } from '@/types/database'
@@ -10,9 +10,10 @@ export default function LiveScansPage() {
   const [scans, setScans] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const latestScanIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    fetchScans()
+    fetchScans(true)
 
     // Setup Supabase Realtime listener
     const isSupabaseConfigured =
@@ -22,33 +23,49 @@ export default function LiveScansPage() {
     let channel: any = null
 
     if (isSupabaseConfigured) {
-      channel = supabase
-        .channel('live-scans-channel')
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'scan_logs' },
-          (payload) => {
-            const newScan = payload.new
-            handleNewLiveScan(newScan)
-          }
-        )
-        .subscribe()
-    } else {
-      // Polling fallback in demo mode to pick up new scans
-      const interval = setInterval(fetchScans, 3000)
-      return () => clearInterval(interval)
+      try {
+        channel = supabase
+          .channel('live-scans-channel')
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'scan_logs' },
+            (payload) => {
+              const newScan = payload.new
+              if (newScan) {
+                handleNewLiveScan(newScan)
+                latestScanIdRef.current = newScan.id
+              }
+            }
+          )
+          .subscribe()
+      } catch (e) {}
     }
+
+    // Always poll every 3 seconds to guarantee updates even if Supabase Realtime is inactive
+    const interval = setInterval(() => {
+      fetchScans(false)
+    }, 3000)
 
     return () => {
       if (channel) supabase.removeChannel(channel)
+      clearInterval(interval)
     }
   }, [soundEnabled])
 
-  const fetchScans = async () => {
+  const fetchScans = async (isInitial = false) => {
     try {
       const res = await fetch('/api/scans?limit=50')
       const json = await res.json()
-      if (json.success) {
+      if (json.success && json.scans) {
+        if (!isInitial && latestScanIdRef.current && json.scans.length > 0) {
+          const newest = json.scans[0]
+          if (newest.id !== latestScanIdRef.current) {
+            handleNewLiveScan(newest)
+          }
+        }
+        if (json.scans.length > 0) {
+          latestScanIdRef.current = json.scans[0].id
+        }
         setScans(json.scans)
       }
     } catch (e) {

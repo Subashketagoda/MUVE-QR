@@ -353,14 +353,51 @@ export default function UserScanPage() {
         }),
       })
 
-      const json = await res.json()
+      const playScanBeep = (isSuccess = true) => {
+        try {
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+          if (!AudioCtx) return
+          const ctx = new AudioCtx()
+          const now = ctx.currentTime
+          const osc = ctx.createOscillator()
+          const gain = ctx.createGain()
+          osc.type = 'sine'
+          if (isSuccess) {
+            osc.frequency.setValueAtTime(880, now) // A5
+            osc.frequency.exponentialRampToValueAtTime(1318.5, now + 0.15) // E6
+            gain.gain.setValueAtTime(0.2, now)
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3)
+            osc.connect(gain)
+            gain.connect(ctx.destination)
+            osc.start(now)
+            osc.stop(now + 0.3)
+          } else {
+            osc.frequency.setValueAtTime(330, now)
+            osc.frequency.linearRampToValueAtTime(220, now + 0.25)
+            gain.gain.setValueAtTime(0.2, now)
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25)
+            osc.connect(gain)
+            gain.connect(ctx.destination)
+            osc.start(now)
+            osc.stop(now + 0.25)
+          }
+        } catch (e) {}
+      }
 
       if (!res.ok || !json.success) {
         setScanError(json.message || 'Scan validation failed')
+        playScanBeep(false)
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate(250)
+        }
         return
       }
 
       setScanResult(json.scan)
+      playScanBeep(true)
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([100, 50, 100])
+      }
       toast.success('✓ Scan Recorded!')
 
       // Persist in localStorage so scans survive server updates

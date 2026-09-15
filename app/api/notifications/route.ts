@@ -55,3 +55,57 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 })
   }
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const { title, message, type = 'scan', scan_id } = body
+
+    if (!title || !message) {
+      return NextResponse.json(
+        { success: false, message: 'Title and message are required' },
+        { status: 400 }
+      )
+    }
+
+    const isSupabaseConfigured =
+      !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+
+    if (isSupabaseConfigured) {
+      const isUUID = (val: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val || '')
+
+      const { data, error } = await (supabaseAdmin as any)
+        .from('notifications')
+        .insert({
+          type,
+          title,
+          message,
+          scan_id: scan_id && isUUID(scan_id) ? scan_id : null,
+          is_read: false,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      return NextResponse.json({ success: true, notification: data })
+    }
+
+    const newNotif = {
+      id: `notif_${Date.now()}`,
+      type: type as any,
+      title,
+      message,
+      scan_id: scan_id || null,
+      is_read: false,
+      created_at: new Date().toISOString(),
+    }
+    INITIAL_NOTIFICATIONS.unshift(newNotif)
+
+    return NextResponse.json({ success: true, notification: newNotif })
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 })
+  }
+}
+
