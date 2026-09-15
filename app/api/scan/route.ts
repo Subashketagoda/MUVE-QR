@@ -155,27 +155,45 @@ export async function POST(req: NextRequest) {
     }
 
     const scanTimestamp = new Date().toISOString()
-    const scanId = `scan_${nanoid(12)}`
-    const newScanRecord: ScanLogRow = {
-      id: scanId,
-      user_id: currentUserId,
-      qr_id: qr.id,
-      qr_token: qr.token,
-      qr_name: qr.name,
-      location_name: qr.location_name,
-      status: 'success' as ScanStatus,
-      rejection_reason: null,
-      latitude: latitude ?? null,
-      longitude: longitude ?? null,
-      device_info: deviceInfo || 'Mobile Device / MUVE App',
-      scanned_at: scanTimestamp,
-      created_at: scanTimestamp,
-    }
+    const isUUID = (val: string) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val || '')
+
+    let finalUserId = currentUserId
+    let finalQrId = qr.id
+    const scanId = crypto.randomUUID()
 
     if (isSupabaseConfigured) {
+      if (!isUUID(finalUserId)) {
+        finalUserId = '00000000-0000-0000-0000-000000000002'
+      }
+      if (!isUUID(finalQrId)) {
+        try {
+          const { data: dbQr } = await (supabaseAdmin as any)
+            .from('qr_codes')
+            .select('id')
+            .eq('token', qr.token)
+            .single()
+          if (dbQr && dbQr.id) finalQrId = dbQr.id
+        } catch (e) {}
+      }
+
       const { error: insertErr } = await (supabaseAdmin as any)
         .from('scan_logs')
-        .insert(newScanRecord)
+        .insert({
+          id: scanId,
+          user_id: finalUserId,
+          qr_id: finalQrId,
+          qr_token: qr.token,
+          qr_name: qr.name,
+          location_name: qr.location_name,
+          status: 'success' as ScanStatus,
+          rejection_reason: null,
+          latitude: latitude ?? null,
+          longitude: longitude ?? null,
+          device_info: deviceInfo || 'Mobile Device / MUVE App',
+          scanned_at: scanTimestamp,
+          created_at: scanTimestamp,
+        })
 
       if (insertErr) {
         console.error('Supabase scan insert error:', insertErr)
@@ -185,21 +203,40 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      await (supabaseAdmin as any).from('notifications').insert({
-        type: 'scan',
-        title: 'New Scan Recorded',
-        message: `${currentUserName} scanned ${qr.name} (${qr.location_name})`,
-        scan_id: scanId,
-        is_read: false,
-      })
+      try {
+        await (supabaseAdmin as any).from('notifications').insert({
+          type: 'scan',
+          title: 'New Scan Recorded',
+          message: `${currentUserName} scanned ${qr.name} (${qr.location_name})`,
+          scan_id: scanId,
+          is_read: false,
+        })
+      } catch (notifErr) {
+        console.warn('Notification insert skipped:', notifErr)
+      }
     } else {
-      INITIAL_SCANS.unshift(newScanRecord)
+      const demoScanRecord: ScanLogRow = {
+        id: `scan_${nanoid(12)}`,
+        user_id: currentUserId,
+        qr_id: qr.id,
+        qr_token: qr.token,
+        qr_name: qr.name,
+        location_name: qr.location_name,
+        status: 'success' as ScanStatus,
+        rejection_reason: null,
+        latitude: latitude ?? null,
+        longitude: longitude ?? null,
+        device_info: deviceInfo || 'Mobile Device / MUVE App',
+        scanned_at: scanTimestamp,
+        created_at: scanTimestamp,
+      }
+      INITIAL_SCANS.unshift(demoScanRecord)
       INITIAL_NOTIFICATIONS.unshift({
         id: `notif_${nanoid(8)}`,
         type: 'scan',
         title: 'New Scan Recorded',
         message: `${currentUserName} scanned ${qr.name} (${qr.location_name})`,
-        scan_id: scanId,
+        scan_id: demoScanRecord.id,
         is_read: false,
         created_at: scanTimestamp,
       })

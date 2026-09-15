@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase/client'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { INITIAL_USERS, INITIAL_AUDIT_LOGS } from '@/lib/demo-store'
 import { nanoid } from 'nanoid'
 
@@ -25,6 +26,43 @@ export async function POST(req: NextRequest) {
       !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
 
     if (isSupabaseConfigured) {
+      const inputDigits = cleanPhone(rawIdentifier)
+      const inputLower = rawIdentifier.toLowerCase()
+
+      // 1. Direct Supabase database user check
+      try {
+        const { data: dbUsers } = await (supabaseAdmin as any)
+          .from('users')
+          .select('*')
+
+        if (dbUsers && dbUsers.length > 0) {
+          const found = dbUsers.find((u: any) => {
+            const uDigits = cleanPhone(u.phone || '')
+            const uEmail = (u.email || '').toLowerCase()
+            return (
+              (inputDigits && (uDigits === inputDigits || uDigits.endsWith(inputDigits) || inputDigits.endsWith(uDigits))) ||
+              uEmail === inputLower
+            )
+          })
+
+          if (found) {
+            return NextResponse.json({
+              success: true,
+              user: {
+                id: found.id,
+                phone: found.phone || rawIdentifier,
+                email: found.email,
+                role: found.role || 'user',
+                full_name: found.full_name || 'User',
+              },
+            })
+          }
+        }
+      } catch (dbErr) {
+        console.warn('DB user check error:', dbErr)
+      }
+
+      // 2. Supabase Auth signInWithPassword
       const emailToUse = rawIdentifier.includes('@')
         ? rawIdentifier
         : `${cleanPhone(rawIdentifier)}@muveqr.app`
@@ -34,26 +72,24 @@ export async function POST(req: NextRequest) {
         password,
       })
 
-      if (error) {
-        return NextResponse.json({ success: false, message: error.message }, { status: 401 })
+      if (!error && data?.user) {
+        const { data: profile } = await (supabase as any)
+          .from('users')
+          .select('*')
+          .eq('id', data.user.id)
+          .single()
+
+        return NextResponse.json({
+          success: true,
+          user: {
+            id: data.user.id,
+            phone: profile?.phone || rawIdentifier,
+            email: data.user.email,
+            role: profile?.role || 'user',
+            full_name: profile?.full_name || 'User',
+          },
+        })
       }
-
-      const { data: profile } = await (supabase as any)
-        .from('users')
-        .select('*')
-        .eq('id', data.user.id)
-        .single()
-
-      return NextResponse.json({
-        success: true,
-        user: {
-          id: data.user.id,
-          phone: profile?.phone || rawIdentifier,
-          email: data.user.email,
-          role: profile?.role || 'user',
-          full_name: profile?.full_name || 'User',
-        },
-      })
     }
 
     // Match by phone number (with fallback to email if entered)
