@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState, useRef, useCallback } from 'react'
+import Link from 'next/link'
 import { Html5Qrcode, CameraDevice } from 'html5-qrcode'
 import { Logo } from '@/components/shared/Logo'
 import {
@@ -21,6 +22,7 @@ import {
   AlertTriangle,
   QrCode,
   X,
+  ArrowLeft,
 } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
@@ -429,12 +431,19 @@ export default function UserScanPage() {
   }
 
   return (
-    <div className="p-4 space-y-5 max-w-lg mx-auto select-none">
+    <div className="p-4 space-y-4 max-w-lg mx-auto select-none">
       {/* Header */}
-      <div className="text-center pt-2">
-        <Logo size="sm" showSubtitle={true} subtitleText="COLOMBO" />
-        <h2 className="text-xl font-black text-slate-900 mt-2 tracking-tight">Scan QR Code</h2>
-        <p className="text-xs text-slate-500">Position the MUVE QR token inside the viewfinder</p>
+      <div className="flex items-center justify-between pt-1">
+        <Link
+          href="/app/home"
+          className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center text-slate-700 active:scale-95 transition"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </Link>
+        <div className="text-center flex-1 pr-9">
+          <h2 className="text-lg font-black text-slate-900 tracking-tight">Scan QR Code</h2>
+          <p className="text-[11px] text-slate-500 font-medium">Position code inside viewfinder</p>
+        </div>
       </div>
 
       {/* VIEWPORT CAMERA / VIEWFINDER CONTAINER */}
