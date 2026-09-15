@@ -13,7 +13,6 @@ import {
   RotateCcw,
   Camera,
   AlertOctagon,
-  Sparkles,
   RefreshCw,
   SwitchCamera,
   Flashlight,
@@ -22,7 +21,6 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { QRCodeRow } from '@/types/database'
 
 export default function UserScanPage() {
   const [scannerActive, setScannerActive] = useState(false)
@@ -31,8 +29,6 @@ export default function UserScanPage() {
   const [scanning, setScanning] = useState(false)
   const [scanResult, setScanResult] = useState<any>(null)
   const [scanError, setScanError] = useState<string | null>(null)
-  const [demoQRCodes, setDemoQRCodes] = useState<QRCodeRow[]>([])
-
   // Multi-camera support
   const [cameras, setCameras] = useState<CameraDevice[]>([])
   const [currentCameraId, setCurrentCameraId] = useState<string | null>(null)
@@ -42,19 +38,6 @@ export default function UserScanPage() {
   const html5QrcodeRef = useRef<Html5Qrcode | null>(null)
   const isStartingRef = useRef(false)
   const isStoppingRef = useRef(false)
-
-  // Fetch available demo QR codes for simulator fallback
-  const fetchDemoQRCodes = useCallback(async () => {
-    try {
-      const res = await fetch('/api/qr-codes')
-      const json = await res.json()
-      if (json.success && json.qrCodes) {
-        setDemoQRCodes(json.qrCodes)
-      }
-    } catch (e) {
-      console.warn('Failed to fetch demo codes', e)
-    }
-  }, [])
 
   // Safely stop scanner without leaving camera hardware locked
   const stopScanner = useCallback(async () => {
@@ -257,7 +240,6 @@ export default function UserScanPage() {
 
   // Initial load
   useEffect(() => {
-    fetchDemoQRCodes()
     startScanner()
 
     return () => {
@@ -414,10 +396,6 @@ export default function UserScanPage() {
                   </button>
                 )}
               </div>
-
-              <p className="text-[11px] text-slate-400 pt-1">
-                Tip: You can also use the <strong>Test Simulator</strong> below to test scanning without camera!
-              </p>
             </div>
           )}
 
@@ -569,51 +547,6 @@ export default function UserScanPage() {
           </div>
         )}
       </div>
-
-      {/* SIMULATED QR TESTING PANEL (Accessible for fallback testing) */}
-      {!scanResult && !scanError && (
-        <div className="card p-4 space-y-3 bg-slate-50 border border-slate-200 rounded-2xl shadow-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-blue-600" />
-              <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                Quick Test QR Simulator
-              </h4>
-            </div>
-            <span className="text-[10px] text-slate-400 font-medium">No Camera Required</span>
-          </div>
-
-          <p className="text-[11px] text-slate-500 leading-snug">
-            Tap any active checkpoint below to test scan submission instantly:
-          </p>
-
-          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-            {demoQRCodes.length === 0 ? (
-              <div className="p-3 text-center text-xs text-slate-400 bg-white rounded-xl border border-slate-200">
-                Loading test QR codes...
-              </div>
-            ) : (
-              demoQRCodes.map((qr) => (
-                <button
-                  key={qr.id}
-                  type="button"
-                  onClick={() => processScanToken(qr.token)}
-                  disabled={scanning}
-                  className="w-full p-2.5 bg-white hover:bg-blue-50 active:scale-[0.99] border border-slate-200 rounded-xl text-left flex items-center justify-between transition group cursor-pointer shadow-xs"
-                >
-                  <div className="truncate pr-2">
-                    <p className="font-bold text-xs text-slate-900 group-hover:text-blue-600 truncate">
-                      {qr.name} • {qr.location_name}
-                    </p>
-                    <p className="text-[10px] text-slate-400 font-mono truncate">{qr.token}</p>
-                  </div>
-                  <span className="badge badge-blue text-[10px] flex-shrink-0">Test Scan</span>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
