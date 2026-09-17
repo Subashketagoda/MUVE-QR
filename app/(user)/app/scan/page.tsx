@@ -238,9 +238,8 @@ export default function UserScanPage() {
     if (!html5QrcodeRef.current || !hasTorch) return
     try {
       const nextState = !torchOn
-      // @ts-ignore
       await html5QrcodeRef.current.applyVideoConstraints({
-        advanced: [{ torch: nextState }],
+        advanced: [{ torch: nextState } as any],
       })
       setTorchOn(nextState)
     } catch (e) {

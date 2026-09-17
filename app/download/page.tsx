@@ -34,7 +34,7 @@ export default function DownloadPage() {
         dark: '#050D1A',
         light: '#FFFFFF',
       },
-    }).then((url) => setQrDataUrl(url))
+    }).then((url: string) => setQrDataUrl(url))
 
     // Capture PWA install prompt on Android Chrome
     const handler = (e: any) => {

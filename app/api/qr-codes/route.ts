@@ -4,6 +4,9 @@ import { INITIAL_QR_CODES, INITIAL_AUDIT_LOGS } from '@/lib/demo-store'
 import { QRCodeRow } from '@/types/database'
 import { nanoid } from 'nanoid'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET(req: NextRequest) {
   try {
     const isSupabaseConfigured =
@@ -15,9 +18,9 @@ export async function GET(req: NextRequest) {
         const { data, error } = await (supabaseAdmin as any)
           .from('qr_codes')
           .select('*')
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: true })
 
-        if (!error && data && data.length > 0) {
+        if (!error && Array.isArray(data)) {
           return NextResponse.json({ success: true, qrCodes: data })
         }
       } catch (sbErr) {
@@ -114,7 +117,7 @@ export async function POST(req: NextRequest) {
       admin_name: 'System Admin',
       action: 'qr_created',
       target_type: 'qr_code',
-      target_id: qrId,
+      target_id: newQR.id,
       target_name: name,
       details: { location: location_name, token },
       ip_address: '127.0.0.1',

@@ -9,6 +9,7 @@ import {
   Filter,
   Calendar,
   RefreshCw,
+  Clock,
 } from 'lucide-react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
@@ -45,15 +46,62 @@ export default function ReportsPage() {
     }
   }
 
-  const fetchReport = async () => {
+  function formatRowDateTime(
+    scannedAt: string,
+    fallbackDate?: string,
+    fallbackTime?: string,
+    fallbackTime24?: string
+  ) {
+    if (!scannedAt) {
+      return {
+        date: fallbackDate || 'N/A',
+        time12: fallbackTime || 'N/A',
+        time24: fallbackTime24 || fallbackTime || 'N/A',
+      }
+    }
+    const d = new Date(scannedAt)
+    if (isNaN(d.getTime())) {
+      return {
+        date: fallbackDate || 'N/A',
+        time12: fallbackTime || 'N/A',
+        time24: fallbackTime24 || fallbackTime || 'N/A',
+      }
+    }
+
+    const date = d.toLocaleDateString('en-GB')
+    const time12 = d.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+    })
+    const time24 = d.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    })
+
+    return { date, time12, time24 }
+  }
+
+  const fetchReport = async (overrideStart?: string, overrideEnd?: string) => {
     setLoading(true)
     try {
+      const sDate = overrideStart !== undefined ? overrideStart : startDate
+      const eDate = overrideEnd !== undefined ? overrideEnd : endDate
+
       const params = new URLSearchParams()
-      if (startDate) params.append('startDate', startDate)
-      if (endDate) params.append('endDate', endDate)
+      if (sDate) params.append('startDate', sDate)
+      if (eDate) params.append('endDate', eDate)
       if (selectedUser) params.append('userId', selectedUser)
       if (selectedQR) params.append('qrId', selectedQR)
       if (selectedStatus) params.append('status', selectedStatus)
+
+      try {
+        const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+        if (localTz) params.append('timezone', localTz)
+      } catch (e) {}
 
       const res = await fetch(`/api/reports?${params.toString()}`)
       const json = await res.json()
@@ -77,8 +125,20 @@ export default function ReportsPage() {
     } else if (type === 'month') {
       start = new Date(now.getFullYear(), now.getMonth(), 1)
     }
-    setStartDate(start.toISOString().split('T')[0])
-    setEndDate(now.toISOString().split('T')[0])
+
+    const fmtLocal = (d: Date) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    }
+
+    const sStr = fmtLocal(start)
+    const eStr = fmtLocal(now)
+    setStartDate(sStr)
+    setEndDate(eStr)
+
+    fetchReport(sStr, eStr)
   }
 
   // EXPORT 1: CSV
@@ -87,16 +147,20 @@ export default function ReportsPage() {
       toast.error('No data available to export')
       return
     }
-    const formatted = reportData.map((row) => ({
-      Date: row.date,
-      Time: row.time,
-      User: row.user,
-      UserEmail: row.user_email,
-      QRCode: row.qr,
-      Location: row.location,
-      Status: row.status,
-      Device: row.device,
-    }))
+    const formatted = reportData.map((row) => {
+      const dt = formatRowDateTime(row.scanned_at, row.date, row.time, row.time_24)
+      return {
+        Date: dt.date,
+        'Exact Time (12h)': dt.time12,
+        'Time (24h)': dt.time24,
+        User: row.user,
+        UserEmail: row.user_email,
+        QRCode: row.qr,
+        Location: row.location,
+        Status: row.status,
+        Device: row.device,
+      }
+    })
     const csv = Papa.unparse(formatted)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -113,16 +177,20 @@ export default function ReportsPage() {
       toast.error('No data available to export')
       return
     }
-    const formatted = reportData.map((row) => ({
-      Date: row.date,
-      Time: row.time,
-      User: row.user,
-      UserEmail: row.user_email,
-      QRCode: row.qr,
-      Location: row.location,
-      Status: row.status,
-      Device: row.device,
-    }))
+    const formatted = reportData.map((row) => {
+      const dt = formatRowDateTime(row.scanned_at, row.date, row.time, row.time_24)
+      return {
+        Date: dt.date,
+        'Exact Time (12h)': dt.time12,
+        'Time (24h)': dt.time24,
+        User: row.user,
+        UserEmail: row.user_email,
+        QRCode: row.qr,
+        Location: row.location,
+        Status: row.status,
+        Device: row.device,
+      }
+    })
     const worksheet = XLSX.utils.json_to_sheet(formatted)
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Scan Report')
@@ -152,17 +220,20 @@ export default function ReportsPage() {
       doc.setTextColor(100)
       doc.text(`Generated on: ${new Date().toLocaleString()} | Total Records: ${reportData.length}`, 14, 28)
 
-      const tableRows = reportData.map((row) => [
-        row.date,
-        row.time,
-        row.user,
-        row.qr,
-        row.location,
-        row.status.toUpperCase(),
-      ])
+      const tableRows = reportData.map((row) => {
+        const dt = formatRowDateTime(row.scanned_at, row.date, row.time, row.time_24)
+        return [
+          dt.date,
+          `${dt.time12}\n(${dt.time24})`,
+          row.user,
+          row.qr,
+          row.location,
+          row.status.toUpperCase(),
+        ]
+      })
 
       autoTable(doc, {
-        head: [['Date', 'Time', 'User', 'QR Code', 'Location', 'Status']],
+        head: [['Date', 'Exact Time', 'User', 'QR Code', 'Location', 'Status']],
         body: tableRows,
         startY: 34,
         styles: { fontSize: 8 },
@@ -276,7 +347,7 @@ export default function ReportsPage() {
         </div>
 
         <div className="flex items-end gap-2">
-          <button onClick={fetchReport} className="btn btn-primary btn-sm flex-1">
+          <button onClick={() => fetchReport()} className="btn btn-primary btn-sm flex-1">
             <Filter className="w-4 h-4" />
             Apply Filter
           </button>
@@ -313,7 +384,9 @@ export default function ReportsPage() {
               <tbody className="divide-y divide-slate-100">
                 {reportData.map((row) => (
                   <tr key={row.id}>
-                    <td className="font-medium text-slate-900">{row.date}</td>
+                    <td className="font-medium text-slate-900">
+                      {formatRowDateTime(row.scanned_at, row.date, row.time, row.time_24).date}
+                    </td>
                     <td className="font-semibold text-slate-800">
                       {row.user}
                       {row.user_email && (
@@ -326,7 +399,22 @@ export default function ReportsPage() {
                       <span className="badge badge-navy">{row.qr}</span>
                     </td>
                     <td className="text-slate-700">{row.location}</td>
-                    <td className="font-mono text-xs font-semibold text-slate-900">{row.time}</td>
+                    <td className="font-mono text-xs font-semibold text-slate-900">
+                      {(() => {
+                        const dt = formatRowDateTime(row.scanned_at, row.date, row.time, row.time_24)
+                        return (
+                          <div>
+                            <div className="flex items-center gap-1.5 text-slate-950 font-bold">
+                              <Clock className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                              <span>{dt.time12}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-normal pl-5 mt-0.5">
+                              {dt.time24} (24h)
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </td>
                     <td>
                       <span
                         className={`badge ${

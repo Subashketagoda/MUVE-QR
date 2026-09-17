@@ -14,59 +14,17 @@ import {
   X,
   CheckCircle,
   AlertTriangle,
-  RotateCcw,
+  RefreshCw,
+  Trash2,
+  Search,
 } from 'lucide-react'
 import { QRCodeRow } from '@/types/database'
 import { toast } from 'sonner'
 
-const DEFAULT_QR_CODES: QRCodeRow[] = [
-  {
-    id: 'e2b55a08-f8bf-440d-b9c0-5ff9dafc6b1f',
-    name: 'QR1',
-    token: 'MUVEQR-MainEntrance-xK9mP2nQ8vR3tL7w',
-    location_name: 'Main Entrance',
-    description: 'Primary building entrance scanner point',
-    status: 'active',
-    latitude: 6.9271,
-    longitude: 79.8612,
-    geofence_radius: null,
-    created_by: '00000000-0000-0000-0000-000000000001',
-    created_at: new Date(Date.now() - 25 * 86400000).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '33fba264-73c7-47b4-a28b-57ee84b0be5e',
-    name: 'QR2',
-    token: 'MUVEQR-Office-yJ4nM6pS1uW5eA8d',
-    location_name: 'Office',
-    description: 'Main executive office area access point',
-    status: 'active',
-    latitude: 6.9275,
-    longitude: 79.8615,
-    geofence_radius: null,
-    created_by: '00000000-0000-0000-0000-000000000001',
-    created_at: new Date(Date.now() - 20 * 86400000).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '36ba1b20-eff9-4b50-87df-aafc8b4f3d68',
-    name: 'QR3',
-    token: 'MUVEQR-Warehouse-zH7kB9qT0iC4fG2x',
-    location_name: 'Warehouse',
-    description: 'Warehouse loading dock entrance checkpoint',
-    status: 'active',
-    latitude: 6.9280,
-    longitude: 79.8620,
-    geofence_radius: null,
-    created_by: '00000000-0000-0000-0000-000000000001',
-    created_at: new Date(Date.now() - 18 * 86400000).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-]
-
 export default function QRCodesPage() {
-  const [qrCodes, setQrCodes] = useState<QRCodeRow[]>(DEFAULT_QR_CODES)
+  const [qrCodes, setQrCodes] = useState<QRCodeRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -88,61 +46,64 @@ export default function QRCodesPage() {
   const [qrImageDataUrl, setQrImageDataUrl] = useState<string>('')
 
   useEffect(() => {
+    // Clear any stale local storage from previous demo runs
+    try {
+      localStorage.removeItem('muve_local_qrcodes')
+    } catch (e) {}
     fetchQRCodes()
   }, [])
 
   const fetchQRCodes = async () => {
     setLoading(true)
-    let localList: QRCodeRow[] = []
     try {
-      const raw = JSON.parse(localStorage.getItem('muve_local_qrcodes') || '[]')
-      localList = (raw || []).filter((q: any) => q.id && !q.id.startsWith('qr_'))
-      if (localList.length > 0) {
-        setQrCodes(localList)
-      } else {
-        setQrCodes(DEFAULT_QR_CODES)
-      }
-    } catch (e) {
-      setQrCodes(DEFAULT_QR_CODES)
-    }
+      localStorage.removeItem('muve_local_qrcodes')
+    } catch (e) {}
 
     try {
-      const res = await fetch('/api/qr-codes')
+      const res = await fetch(`/api/qr-codes?t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
-      const serverList =
-        data.success && data.qrCodes && data.qrCodes.length > 0
-          ? data.qrCodes
-          : DEFAULT_QR_CODES
-
-      const map = new Map()
-      // Put default demo codes first
-      DEFAULT_QR_CODES.forEach((q: any) => map.set(q.id, q))
-      // Merge local storage codes
-      localList.forEach((q: any) => map.set(q.id, q))
-      // Merge server codes
-      serverList.forEach((q: any) => map.set(q.id, q))
-
-      const combined = Array.from(map.values()) as QRCodeRow[]
-      setQrCodes(combined)
-      localStorage.setItem('muve_local_qrcodes', JSON.stringify(combined))
-    } catch (e) {
-      if (localList.length === 0) {
-        setQrCodes(DEFAULT_QR_CODES)
-        localStorage.setItem('muve_local_qrcodes', JSON.stringify(DEFAULT_QR_CODES))
+      if (data.success && Array.isArray(data.qrCodes)) {
+        // Discard any residual dummy/old names that might remain
+        const cleanList = data.qrCodes.filter((q: QRCodeRow) => {
+          const n = (q.name || '').trim()
+          const loc = (q.location_name || '').trim()
+          if (['QR1', 'QR2', 'QR3', 'Office Reception', 'test'].includes(n)) return false
+          if (n.includes('m m m') || n.includes('njbjkbj')) return false
+          if (n.includes(' / ') || loc.includes(' / ')) return false
+          return true
+        })
+        setQrCodes(cleanList)
       }
+    } catch (e) {
+      console.error('Error loading QR codes:', e)
+      toast.error('Failed to load QR codes from database')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleRestoreDefaults = () => {
-    const map = new Map()
-    DEFAULT_QR_CODES.forEach((q) => map.set(q.id, q))
-    qrCodes.forEach((q) => map.set(q.id, q))
-    const merged = Array.from(map.values())
-    setQrCodes(merged)
-    localStorage.setItem('muve_local_qrcodes', JSON.stringify(merged))
-    toast.success('Default QR codes restored (QR1, QR2, QR3)')
+  const handleRefresh = () => {
+    try {
+      localStorage.removeItem('muve_local_qrcodes')
+    } catch (e) {}
+    fetchQRCodes()
+    toast.success('Refreshed QR codes from database')
+  }
+
+  const handleDeleteQR = async (qr: QRCodeRow) => {
+    if (!confirm(`Are you sure you want to permanently delete "${qr.name}"?`)) return
+    try {
+      const res = await fetch(`/api/qr-codes/${qr.id}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (json.success) {
+        toast.success(`Deleted ${qr.name}`)
+        setQrCodes((prev) => prev.filter((item) => item.id !== qr.id))
+      } else {
+        toast.error(json.message || 'Failed to delete')
+      }
+    } catch (e) {
+      toast.error('Error deleting QR code')
+    }
   }
 
   const handleOpenCreateModal = () => {
@@ -156,7 +117,6 @@ export default function QRCodesPage() {
       longitude: '',
       geofence_radius: '',
     })
-    setIsModalOpen(true)
   }
 
   const handleOpenEditModal = (qr: QRCodeRow) => {
@@ -385,6 +345,16 @@ export default function QRCodesPage() {
     })
   }
 
+  const filteredQRCodes = qrCodes.filter((q) => {
+    if (!search.trim()) return true
+    const term = search.toLowerCase().trim()
+    return (
+      (q.name && q.name.toLowerCase().includes(term)) ||
+      (q.location_name && q.location_name.toLowerCase().includes(term)) ||
+      (q.description && q.description.toLowerCase().includes(term))
+    )
+  })
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -398,12 +368,12 @@ export default function QRCodesPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={handleRestoreDefaults}
+            onClick={handleRefresh}
             className="btn btn-secondary btn-sm flex items-center gap-1.5"
-            title="Restore default demo QR codes"
+            title="Refresh QR codes from database"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Restore Defaults</span>
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Refresh</span>
           </button>
           <button onClick={handleOpenCreateModal} className="btn btn-primary btn-sm flex items-center gap-1.5">
             <Plus className="w-4 h-4" />
@@ -412,30 +382,52 @@ export default function QRCodesPage() {
         </div>
       </div>
 
+      {/* Search Filter and Stats Bar */}
+      <div className="card p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search by floor or location (e.g. 01st Floor, Washroom, Rooftop, Pantry)..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="form-input pl-9 text-xs"
+          />
+        </div>
+        <div className="text-xs text-slate-600 font-semibold px-2">
+          Active Checkpoints: <span className="text-blue-600 font-bold">{filteredQRCodes.length}</span>
+        </div>
+      </div>
+
       {/* Grid of QR Code Cards */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(3)].map((_, i) => (
+          {[...Array(6)].map((_, i) => (
             <div key={i} className="h-64 skeleton rounded-xl" />
           ))}
         </div>
-      ) : qrCodes.length === 0 ? (
+      ) : filteredQRCodes.length === 0 ? (
         <div className="card p-12 text-center max-w-md mx-auto space-y-4">
           <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
             <QrIcon className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="font-bold text-slate-900 text-lg">No QR Codes Found</h3>
+            <h3 className="font-bold text-slate-900 text-lg">
+              {search ? 'No Matching Checkpoints' : 'No QR Codes Found'}
+            </h3>
             <p className="text-slate-500 text-sm mt-1">
-              Restore the default checkpoint codes (QR1, QR2, QR3) or create a new code.
+              {search
+                ? 'Try a different search term or clear the search filter.'
+                : 'Click Create QR Code to add a new checkpoint.'}
             </p>
           </div>
           <div className="flex items-center justify-center gap-3 pt-2">
-            <button onClick={handleRestoreDefaults} className="btn btn-primary btn-sm flex items-center gap-1.5">
-              <RotateCcw className="w-4 h-4" />
-              Restore Defaults
-            </button>
-            <button onClick={handleOpenCreateModal} className="btn btn-secondary btn-sm flex items-center gap-1.5">
+            {search && (
+              <button onClick={() => setSearch('')} className="btn btn-secondary btn-sm text-xs">
+                Clear Search
+              </button>
+            )}
+            <button onClick={handleOpenCreateModal} className="btn btn-primary btn-sm flex items-center gap-1.5 text-xs">
               <Plus className="w-4 h-4" />
               Create New
             </button>
@@ -443,7 +435,7 @@ export default function QRCodesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {qrCodes.map((qr) => (
+          {filteredQRCodes.map((qr) => (
             <QRCard
               key={qr.id}
               qr={qr}
@@ -451,6 +443,7 @@ export default function QRCodesPage() {
               onDownload={(url) => handleDownloadQR(qr, url)}
               onEdit={() => handleOpenEditModal(qr)}
               onToggleStatus={() => handleToggleStatus(qr)}
+              onDelete={() => handleDeleteQR(qr)}
               onPrint={() => handlePrintQR(qr)}
             />
           ))}
@@ -608,6 +601,7 @@ function QRCard({
   onDownload,
   onEdit,
   onToggleStatus,
+  onDelete,
   onPrint,
 }: {
   qr: QRCodeRow
@@ -615,6 +609,7 @@ function QRCard({
   onDownload: (dataUrl?: string) => void
   onEdit: () => void
   onToggleStatus: () => void
+  onDelete: () => void
   onPrint: () => void
 }) {
   const [dataUrl, setDataUrl] = useState('')
@@ -689,6 +684,13 @@ function QRCard({
             title="Edit QR"
           >
             <Edit2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="btn btn-ghost btn-sm p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50"
+            title="Delete QR Permanently"
+          >
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
 
