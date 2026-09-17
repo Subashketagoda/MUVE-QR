@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Trash2,
   Search,
+  Loader2,
 } from 'lucide-react'
 import { QRCodeRow } from '@/types/database'
 import { toast } from 'sonner'
@@ -25,6 +26,8 @@ export default function QRCodesPage() {
   const [qrCodes, setQrCodes] = useState<QRCodeRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [downloadingZip, setDownloadingZip] = useState(false)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -345,6 +348,161 @@ export default function QRCodesPage() {
     })
   }
 
+  // Bulk Download all QR codes as a ZIP of PNG images
+  const handleDownloadAllZip = async () => {
+    const listToDownload = filteredQRCodes.length > 0 ? filteredQRCodes : qrCodes
+    if (!listToDownload.length) {
+      toast.error('No QR codes available to download')
+      return
+    }
+
+    setDownloadingZip(true)
+    const toastId = toast.loading(`Preparing ZIP for ${listToDownload.length} QR codes...`)
+
+    try {
+      const JSZipModule = await import('jszip')
+      const JSZip = (JSZipModule as any).default || JSZipModule
+      const zip = new JSZip()
+      const folder = zip.folder('MUVE_QR_Codes') || zip
+
+      const baseUrl = process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muveqr.app/scan'
+
+      for (let i = 0; i < listToDownload.length; i++) {
+        const qr = listToDownload[i]
+        toast.loading(`Generating QR ${i + 1}/${listToDownload.length}: ${qr.name}...`, { id: toastId })
+
+        const qrScanUrl = `${baseUrl}/${qr.token}`
+        const dataUrl = await QRCode.toDataURL(qrScanUrl, {
+          width: 800,
+          margin: 2,
+          color: {
+            dark: '#072B3B',
+            light: '#FFFFFF',
+          },
+        })
+
+        // Convert base64 dataUrl to pure base64 string
+        const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '')
+        const safeName = (qr.name || `QR_${i + 1}`).replace(/[/\\?%*:|"<>]/g, '_').trim()
+        const safeLoc = (qr.location_name || '').replace(/[/\\?%*:|"<>]/g, '_').trim()
+        const fileName = `${String(i + 1).padStart(2, '0')}. ${safeName}${safeLoc && safeLoc !== safeName ? ` - ${safeLoc}` : ''}.png`
+
+        folder.file(fileName, base64Data, { base64: true })
+      }
+
+      toast.loading('Compressing ZIP archive...', { id: toastId })
+      const content = await zip.generateAsync({ type: 'blob' })
+
+      const blobUrl = URL.createObjectURL(content)
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = `MUVE_QR_Codes_All_${listToDownload.length}_Points.zip`
+      document.body.appendChild(link)
+      link.click()
+      setTimeout(() => {
+        document.body.removeChild(link)
+        URL.revokeObjectURL(blobUrl)
+      }, 500)
+
+      toast.success(`Successfully downloaded ${listToDownload.length} QR codes in ZIP!`, { id: toastId })
+    } catch (err: any) {
+      console.error('Error downloading all ZIP:', err)
+      toast.error('Failed to create ZIP package', { id: toastId })
+    } finally {
+      setDownloadingZip(false)
+    }
+  }
+
+  // Bulk Download all QR codes as a multi-page printable PDF booklet
+  const handleDownloadAllPdf = async () => {
+    const listToDownload = filteredQRCodes.length > 0 ? filteredQRCodes : qrCodes
+    if (!listToDownload.length) {
+      toast.error('No QR codes available to download')
+      return
+    }
+
+    setDownloadingPdf(true)
+    const toastId = toast.loading(`Generating printable PDF booklet (${listToDownload.length} pages)...`)
+
+    try {
+      const { jsPDF } = await import('jspdf')
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const baseUrl = process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muveqr.app/scan'
+
+      for (let i = 0; i < listToDownload.length; i++) {
+        const qr = listToDownload[i]
+        toast.loading(`Rendering badge ${i + 1}/${listToDownload.length}: ${qr.name}...`, { id: toastId })
+
+        if (i > 0) {
+          doc.addPage()
+        }
+
+        const qrScanUrl = `${baseUrl}/${qr.token}`
+        const url = await QRCode.toDataURL(qrScanUrl, { width: 600, margin: 2 })
+
+        // Header branding banner
+        doc.setFillColor(7, 43, 59)
+        doc.rect(0, 0, 210, 36, 'F')
+
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(22)
+        doc.setFont('helvetica', 'bold')
+        doc.text('MUVE QR', 105, 20, { align: 'center' })
+
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'normal')
+        doc.text('ENTERPRISE ACTIVITY & LOCATION TRACKING', 105, 28, { align: 'center' })
+
+        // Page indicator
+        doc.setFontSize(8)
+        doc.setTextColor(203, 213, 225)
+        doc.text(`CHECKPOINT ${i + 1} OF ${listToDownload.length}`, 195, 20, { align: 'right' })
+
+        // Checkpoint details
+        doc.setTextColor(15, 23, 42)
+        doc.setFontSize(18)
+        doc.setFont('helvetica', 'bold')
+        doc.text(qr.name, 105, 54, { align: 'center' })
+
+        doc.setTextColor(37, 99, 235)
+        doc.setFontSize(13)
+        doc.text(qr.location_name || '', 105, 63, { align: 'center' })
+
+        // QR Code image
+        doc.addImage(url, 'PNG', 45, 74, 120, 120)
+
+        // Token display box
+        doc.setFillColor(241, 245, 249)
+        doc.roundedRect(30, 204, 150, 14, 3, 3, 'F')
+        doc.setTextColor(100, 116, 139)
+        doc.setFontSize(8)
+        doc.setFont('courier', 'bold')
+        doc.text(`Token: ${qr.token}`, 105, 213, { align: 'center' })
+
+        // Instructions
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(9)
+        doc.setTextColor(100, 116, 139)
+        doc.text('Scan with your smartphone camera or the official MUVE QR Mobile App', 105, 235, { align: 'center' })
+
+        // Footer border
+        doc.setDrawColor(226, 232, 240)
+        doc.line(20, 265, 190, 265)
+        doc.setFontSize(8)
+        doc.text(`MUVE Security Patrol & Checkpoint Verification System • Page ${i + 1} of ${listToDownload.length}`, 105, 275, { align: 'center' })
+      }
+
+      toast.loading('Saving PDF...', { id: toastId })
+      doc.save(`MUVE_QR_Checkpoints_All_${listToDownload.length}_Badges.pdf`)
+      toast.success(`Successfully downloaded PDF booklet with ${listToDownload.length} badges!`, { id: toastId })
+    } catch (err: any) {
+      console.error('Error generating PDF booklet:', err)
+      toast.error('Failed to generate PDF booklet', { id: toastId })
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
+
   const filteredQRCodes = qrCodes.filter((q) => {
     if (!search.trim()) return true
     const term = search.toLowerCase().trim()
@@ -365,7 +523,37 @@ export default function QRCodesPage() {
             Create, edit, activate, and manage location QR codes across your facilities
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleDownloadAllZip}
+            disabled={downloadingZip || loading || filteredQRCodes.length === 0}
+            className="btn btn-secondary btn-sm flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm"
+            title="Download all QR codes as high-res PNG images in a single ZIP file"
+          >
+            {downloadingZip ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+            ) : (
+              <Download className="w-3.5 h-3.5 text-blue-600" />
+            )}
+            <span>{downloadingZip ? 'Zipping...' : 'Download All (ZIP)'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadAllPdf}
+            disabled={downloadingPdf || loading || filteredQRCodes.length === 0}
+            className="btn btn-secondary btn-sm flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm"
+            title="Download all checkpoints as a multi-page printable A4 PDF booklet"
+          >
+            {downloadingPdf ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+            ) : (
+              <Printer className="w-3.5 h-3.5 text-indigo-600" />
+            )}
+            <span>{downloadingPdf ? 'Generating...' : 'Download All (PDF)'}</span>
+          </button>
+
           <button
             type="button"
             onClick={handleRefresh}
