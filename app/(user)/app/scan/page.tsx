@@ -34,6 +34,11 @@ export default function UserScanPage() {
   const [scanning, setScanning] = useState(false)
   const [scanResult, setScanResult] = useState<any>(null)
   const [scanError, setScanError] = useState<string | null>(null)
+
+  // Continuous patrol mode and countdown
+  const [continuousMode, setContinuousMode] = useState(true)
+  const [countdown, setCountdown] = useState(3)
+
   // Multi-camera support
   const [cameras, setCameras] = useState<CameraDevice[]>([])
   const [currentCameraId, setCurrentCameraId] = useState<string | null>(null)
@@ -48,6 +53,10 @@ export default function UserScanPage() {
   const html5QrcodeRef = useRef<Html5Qrcode | null>(null)
   const isStartingRef = useRef(false)
   const isStoppingRef = useRef(false)
+  const isProcessingRef = useRef(false)
+  const lastScannedTokenRef = useRef<string | null>(null)
+  const lastScannedTimeRef = useRef<number>(0)
+  const autoResumeTimerRef = useRef<any>(null)
 
   // Safely stop scanner without leaving camera hardware locked
   const stopScanner = useCallback(async () => {
@@ -57,13 +66,18 @@ export default function UserScanPage() {
     try {
       if (html5QrcodeRef.current) {
         if (html5QrcodeRef.current.isScanning) {
-          await html5QrcodeRef.current.stop()
+          try {
+            await html5QrcodeRef.current.stop()
+          } catch (e) {}
         }
         try {
-          html5QrcodeRef.current.clear()
-        } catch (e) {
-          // ignore clear error
-        }
+          await html5QrcodeRef.current.clear()
+        } catch (e) {}
+        html5QrcodeRef.current = null
+      }
+      const element = document.getElementById('qr-reader')
+      if (element) {
+        element.innerHTML = ''
       }
     } catch (err) {
       console.warn('Error stopping scanner:', err)
@@ -93,6 +107,7 @@ export default function UserScanPage() {
         setCameraLoading(false)
         return
       }
+      element.innerHTML = ''
 
       // Enumerate cameras if not already done
       let availableCameras = cameras
@@ -123,8 +138,19 @@ export default function UserScanPage() {
       }
 
       const onScanSuccess = async (decodedText: string) => {
-        if (isStartingRef.current) return
-        await stopScanner()
+        if (isStartingRef.current || isProcessingRef.current) return
+
+        const now = Date.now()
+        // Deduplicate identical token scans within 4 seconds
+        if (lastScannedTokenRef.current === decodedText && now - lastScannedTimeRef.current < 4000) {
+          return
+        }
+
+        isProcessingRef.current = true
+        lastScannedTokenRef.current = decodedText
+        lastScannedTimeRef.current = now
+
+        // KEEP CAMERA RUNNING! Do not stop the video stream
         processScanToken(decodedText)
       }
 
@@ -187,6 +213,7 @@ export default function UserScanPage() {
       if (started) {
         setScannerActive(true)
         setCameraError(null)
+        isProcessingRef.current = false
 
         // Check if torch/flashlight is supported
         try {
@@ -301,9 +328,12 @@ export default function UserScanPage() {
     loadAvailableCodes()
 
     return () => {
+      if (autoResumeTimerRef.current) {
+        clearInterval(autoResumeTimerRef.current)
+      }
       stopScanner()
     }
-  }, [loadAvailableCodes])
+  }, [loadAvailableCodes, startScanner, stopScanner])
 
   // Process scanned QR Token
   const processScanToken = async (qrTokenRaw: string) => {
@@ -402,7 +432,7 @@ export default function UserScanPage() {
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate([100, 50, 100])
       }
-      toast.success('✓ Scan Recorded!')
+      toast.success(`✓ Recorded: ${json.scan.qr} - ${json.scan.location}`)
 
       // Persist in localStorage so scans survive server updates
       try {
@@ -418,6 +448,24 @@ export default function UserScanPage() {
         const merged = [scanItem, ...localScans.filter((s: any) => s.id !== scanItem.id)].slice(0, 100)
         localStorage.setItem('muve_local_scans', JSON.stringify(merged))
       } catch (e) {}
+
+      // Auto-ready for next checkpoint if continuous mode is enabled
+      if (continuousMode) {
+        setCountdown(3)
+        if (autoResumeTimerRef.current) clearInterval(autoResumeTimerRef.current)
+
+        let counter = 3
+        const intervalId = setInterval(() => {
+          counter -= 1
+          setCountdown(counter)
+          if (counter <= 0) {
+            clearInterval(intervalId)
+            setScanResult(null)
+            isProcessingRef.current = false
+          }
+        }, 1000)
+        autoResumeTimerRef.current = intervalId
+      }
     } catch (err: any) {
       console.error('Scan error:', err)
       setScanError(err?.message || 'Network connection error while recording scan')
@@ -426,11 +474,18 @@ export default function UserScanPage() {
     }
   }
 
-  // Reset scan and restart camera
+  // Instantly reset scan result to scan next checkpoint without leaving screen
   const handleResetScan = () => {
+    if (autoResumeTimerRef.current) {
+      clearInterval(autoResumeTimerRef.current)
+      autoResumeTimerRef.current = null
+    }
     setScanResult(null)
     setScanError(null)
-    startScanner()
+    isProcessingRef.current = false
+    if (!scannerActive) {
+      startScanner()
+    }
   }
 
   return (
@@ -439,17 +494,30 @@ export default function UserScanPage() {
       style={{ paddingTop: 'max(calc(env(safe-area-inset-top, 0px) + 0.5rem), 2.75rem)' }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <Link
           href="/app/home"
-          className="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center text-slate-700 active:scale-95 transition hover:bg-slate-50"
+          className="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center text-slate-700 active:scale-95 transition hover:bg-slate-50 shrink-0"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <div className="text-center flex-1 pr-10">
-          <h2 className="text-xl font-black text-slate-900 tracking-tight">Scan QR Code</h2>
-          <p className="text-xs text-slate-500 font-medium">Position code inside viewfinder</p>
+        <div className="text-center flex-1 min-w-0">
+          <h2 className="text-lg font-black text-slate-900 tracking-tight truncate">Scan QR Code</h2>
+          <p className="text-[11px] text-slate-500 font-medium truncate">Position code inside viewfinder</p>
         </div>
+        <button
+          type="button"
+          onClick={() => setContinuousMode(!continuousMode)}
+          className={`px-2.5 py-1.5 rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 border transition shrink-0 ${
+            continuousMode
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-xs'
+              : 'bg-slate-100 text-slate-600 border-slate-200'
+          }`}
+          title="Auto-scan next checkpoint continuously"
+        >
+          <span className={`w-2 h-2 rounded-full ${continuousMode ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`} />
+          <span>Auto-Next</span>
+        </button>
       </div>
 
       {/* VIEWPORT CAMERA / VIEWFINDER CONTAINER */}
@@ -538,90 +606,114 @@ export default function UserScanPage() {
 
           {/* SUCCESS RESULT OVERLAY */}
           {scanResult && (
-            <div className="absolute inset-0 bg-gradient-to-b from-emerald-600 to-teal-700 text-white rounded-2xl p-6 flex flex-col justify-between text-center z-20 animate-scale-in">
-              <div className="space-y-3 pt-2">
-                <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md text-white mx-auto flex items-center justify-center shadow-lg">
-                  <CheckCircle2 className="w-9 h-9 text-white" />
+            <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md text-white rounded-2xl p-5 flex flex-col justify-between text-center z-20 animate-scale-in">
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/80 border border-emerald-500/30 px-2.5 py-1 rounded-full">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  Checkpoint Logged
+                </span>
+                <button
+                  type="button"
+                  onClick={handleResetScan}
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center transition"
+                  title="Close and Scan Next"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-2 my-auto py-1">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-400" />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-black text-white tracking-tight">✓ Scan Recorded</h3>
-                  <p className="text-emerald-100 text-xs mt-0.5">Recorded to MUVE QR central cloud database</p>
-                </div>
-              </div>
-
-              <div className="bg-black/20 backdrop-blur-md rounded-xl p-4 text-left space-y-2.5 text-xs border border-white/10 my-2">
-                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                  <span className="text-emerald-200">Checkpoint</span>
-                  <span className="font-bold text-white text-sm">{scanResult.qr}</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                  <span className="text-emerald-200">Location Point</span>
-                  <span className="font-bold text-white text-sm truncate max-w-[180px]">
+                  <h3 className="text-xl font-black text-white tracking-tight">
+                    {scanResult.qr}
+                  </h3>
+                  <p className="text-emerald-300 text-sm font-bold mt-0.5">
                     {scanResult.location}
-                  </span>
+                  </p>
                 </div>
-                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                  <span className="text-emerald-200">Scanned by</span>
-                  <span className="font-semibold text-white">{scanResult.user}</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                  <span className="text-emerald-200">Exact Time</span>
-                  <span className="font-mono font-bold text-white">
-                    {new Date(scanResult.timestamp).toLocaleTimeString([], { hour12: false })}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-emerald-200">Date</span>
-                  <span className="font-semibold text-white">
-                    {new Date(scanResult.timestamp).toLocaleDateString('en-GB')}
-                  </span>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 text-left space-y-1.5 text-xs border border-white/10 max-w-xs mx-auto w-full">
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span>Officer</span>
+                    <span className="font-semibold text-white">{scanResult.user}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300 border-t border-white/10 pt-1.5">
+                    <span>Exact Time</span>
+                    <span className="font-mono font-bold text-emerald-300">
+                      {new Date(scanResult.timestamp).toLocaleTimeString([], { hour12: false })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300 border-t border-white/10 pt-1.5">
+                    <span>Status</span>
+                    <span className="font-bold text-emerald-400">✓ Saved in Database</span>
+                  </div>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleResetScan}
-                className="w-full btn bg-white text-emerald-900 hover:bg-emerald-50 font-black btn-lg shadow-xl active:scale-[0.98] transition"
-              >
-                <RotateCcw className="w-5 h-5" />
-                Continue Scanning
-              </button>
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleResetScan}
+                  className="w-full btn bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black btn-lg shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition flex items-center justify-center gap-2 rounded-xl text-base py-3"
+                >
+                  <QrCode className="w-5 h-5 text-slate-950" />
+                  <span>
+                    Scan Next Checkpoint {continuousMode && countdown > 0 ? `(${countdown}s)` : 'Now'}
+                  </span>
+                </button>
+                <p className="text-[11px] text-slate-300">
+                  {continuousMode
+                    ? `Auto-readies in ${countdown}s — or tap above to scan next immediately`
+                    : 'Tap above to scan next checkpoint without leaving screen'}
+                </p>
+              </div>
             </div>
           )}
 
           {/* REJECTED / ERROR RESULT OVERLAY */}
           {scanError && (
-            <div className="absolute inset-0 bg-gradient-to-b from-red-600 to-rose-700 text-white rounded-2xl p-6 flex flex-col justify-between text-center z-20 animate-scale-in">
-              <div className="space-y-3 pt-4">
-                <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md text-white mx-auto flex items-center justify-center shadow-lg">
-                  <XCircle className="w-9 h-9 text-white" />
+            <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md text-white rounded-2xl p-5 flex flex-col justify-between text-center z-20 animate-scale-in">
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-red-400 bg-red-950/80 border border-red-500/30 px-2.5 py-1 rounded-full">
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                  Scan Rejected
+                </span>
+                <button
+                  type="button"
+                  onClick={handleResetScan}
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center transition"
+                  title="Close and Retry"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="my-auto space-y-3 py-2">
+                <div className="w-14 h-14 rounded-2xl bg-red-500/20 border border-red-500/40 text-red-400 mx-auto flex items-center justify-center shadow-lg shadow-red-500/20">
+                  <XCircle className="w-8 h-8 text-red-400" />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-black text-white tracking-tight">Scan Rejected</h3>
-                  <p className="text-red-100 text-xs mt-1 max-w-xs mx-auto">{scanError}</p>
+                  <h3 className="text-xl font-black text-white tracking-tight">Scan Validation Failed</h3>
+                  <p className="text-red-300 text-xs max-w-xs mx-auto mt-1">{scanError}</p>
                 </div>
               </div>
 
-              <div className="bg-black/20 backdrop-blur-md rounded-xl p-4 text-left text-xs border border-white/10 my-4 space-y-1">
-                <p className="font-bold text-red-200 flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4" />
-                  Possible Reasons:
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={handleResetScan}
+                  className="w-full btn bg-white text-slate-900 hover:bg-slate-100 font-black btn-lg shadow-xl active:scale-[0.98] transition flex items-center justify-center gap-2 rounded-xl text-sm py-3"
+                >
+                  <RotateCcw className="w-4 h-4 text-slate-700" />
+                  <span>Scan Next QR Point</span>
+                </button>
+                <p className="text-[11px] text-slate-400">
+                  Camera is ready — position code inside the viewfinder
                 </p>
-                <ul className="list-disc list-inside text-[11px] text-red-100 space-y-0.5 pt-1">
-                  <li>Invalid or expired QR token</li>
-                  <li>Outside designated GPS geofence</li>
-                  <li>QR point currently deactivated by Admin</li>
-                </ul>
               </div>
-
-              <button
-                type="button"
-                onClick={handleResetScan}
-                className="w-full btn bg-white text-red-700 hover:bg-red-50 font-black btn-lg shadow-xl active:scale-[0.98] transition"
-              >
-                <RotateCcw className="w-5 h-5" />
-                Try Again
-              </button>
             </div>
           )}
         </div>
@@ -734,7 +826,7 @@ export default function UserScanPage() {
                     type="button"
                     onClick={async () => {
                       setShowCodesModal(false)
-                      await stopScanner()
+                      isProcessingRef.current = true
                       processScanToken(qr.token)
                     }}
                     className="w-full btn btn-primary btn-sm rounded-xl font-bold text-xs"
