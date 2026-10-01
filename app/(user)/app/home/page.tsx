@@ -48,6 +48,31 @@ export default function UserHomePage() {
     setUser(currentUsr)
     fetchUserScans(currentUsr.id)
     fetchUserTodos(currentUsr.id)
+
+    // BroadcastChannel sync across tabs
+    let bc: BroadcastChannel | null = null
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        bc = new BroadcastChannel('muve_todos_bus')
+        bc.onmessage = () => {
+          fetchUserTodos(currentUsr.id)
+        }
+      }
+    } catch (e) {}
+
+    // Fast polling interval
+    const interval = setInterval(() => {
+      fetchUserTodos(currentUsr.id)
+    }, 3000)
+
+    const onFocus = () => fetchUserTodos(currentUsr.id)
+    window.addEventListener('focus', onFocus)
+
+    return () => {
+      clearInterval(interval)
+      if (bc) bc.close()
+      window.removeEventListener('focus', onFocus)
+    }
   }, [])
 
   const fetchUserTodos = async (userId: string) => {
@@ -71,6 +96,14 @@ export default function UserHomePage() {
     setTodos((prev) =>
       prev.map((t) => (t.id === todo.id ? { ...t, status: nextStatus } : t))
     )
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('muve_todos_bus')
+        bc.postMessage({ type: 'TODO_UPDATED' })
+        bc.close()
+      }
+    } catch (e) {}
+
     try {
       await fetch('/api/todos', {
         method: 'PUT',

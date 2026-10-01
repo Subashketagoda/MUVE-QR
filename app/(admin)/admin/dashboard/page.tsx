@@ -43,11 +43,38 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     fetchAnalytics()
     fetchDashboardTodos()
+
+    // 1. Instant cross-tab sync
+    let bc: BroadcastChannel | null = null
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        bc = new BroadcastChannel('muve_todos_bus')
+        bc.onmessage = () => {
+          fetchDashboardTodos()
+        }
+      }
+    } catch (e) {}
+
+    // 2. Continuous background polling every 2.5s
+    const interval = setInterval(() => {
+      fetchDashboardTodos()
+    }, 2500)
+
+    const onFocus = () => fetchDashboardTodos()
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+
+    return () => {
+      clearInterval(interval)
+      if (bc) bc.close()
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
   }, [])
 
   const fetchDashboardTodos = async () => {
     try {
-      const res = await fetch('/api/todos')
+      const res = await fetch(`/api/todos?t=${Date.now()}`, { cache: 'no-store' })
       const json = await res.json()
       if (json.success && Array.isArray(json.todos)) {
         setTodos(json.todos.slice(0, 5))
@@ -62,6 +89,13 @@ export default function AdminDashboardPage() {
     setTodos((prev) =>
       prev.map((t) => (t.id === todo.id ? { ...t, admin_reviewed: nextReviewed } : t))
     )
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('muve_todos_bus')
+        bc.postMessage({ type: 'TODO_UPDATED' })
+        bc.close()
+      }
+    } catch (e) {}
     try {
       await fetch('/api/todos', {
         method: 'PUT',

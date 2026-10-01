@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import {
   CheckSquare,
   CheckCircle,
@@ -23,6 +23,7 @@ import {
   Eye,
 } from 'lucide-react'
 import { TodoRow, TodoPriority, TodoStatus } from '@/types/database'
+import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
 export default function AdminTodosPage() {
@@ -52,10 +53,61 @@ export default function AdminTodosPage() {
   const [assignDesc, setAssignDesc] = useState('')
   const [assignPriority, setAssignPriority] = useState<TodoPriority>('medium')
   const [assigning, setAssigning] = useState(false)
+  const broadcastRef = useRef<BroadcastChannel | null>(null)
 
   useEffect(() => {
-    fetchTodos()
+    fetchTodos(true)
     fetchUsers()
+
+    // 1. Cross-tab BroadcastChannel for 0ms instant sync
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('muve_todos_bus')
+        broadcastRef.current = bc
+        bc.onmessage = () => {
+          fetchTodos(false)
+        }
+      }
+    } catch (e) {}
+
+    // 2. Supabase Realtime WebSocket listener
+    const isSupabaseConfigured =
+      !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+
+    let channel: any = null
+    if (isSupabaseConfigured) {
+      try {
+        channel = supabase
+          .channel('admin-todos-realtime')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'todos' },
+            () => {
+              fetchTodos(false)
+            }
+          )
+          .subscribe()
+      } catch (e) {}
+    }
+
+    // 3. Fast auto-polling interval every 2.5s (reliable background sync across devices)
+    const interval = setInterval(() => {
+      fetchTodos(false)
+    }, 2500)
+
+    // 4. Focus & visibility listener
+    const onFocus = () => fetchTodos(false)
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+
+    return () => {
+      clearInterval(interval)
+      if (channel) supabase.removeChannel(channel)
+      if (broadcastRef.current) broadcastRef.current.close()
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
   }, [])
 
   const fetchUsers = async () => {
@@ -68,8 +120,8 @@ export default function AdminTodosPage() {
     } catch (e) {}
   }
 
-  const fetchTodos = async () => {
-    setLoading(true)
+  const fetchTodos = async (isInitial = false) => {
+    if (isInitial) setLoading(true)
     try {
       const res = await fetch(`/api/todos?t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
@@ -78,9 +130,9 @@ export default function AdminTodosPage() {
       }
     } catch (e) {
       console.error(e)
-      toast.error('Failed to load user tasks')
+      if (isInitial) toast.error('Failed to load user tasks')
     } finally {
-      setLoading(false)
+      if (isInitial) setLoading(false)
     }
   }
 
@@ -131,7 +183,8 @@ export default function AdminTodosPage() {
         setAssignPriority('medium')
         setAssignUserId('all')
         setIsAssignModalOpen(false)
-        fetchTodos()
+        fetchTodos(false)
+        broadcastRef.current?.postMessage({ type: 'TODO_UPDATED' })
       } else {
         toast.error(data.message || 'Failed to assign task')
       }
@@ -156,6 +209,7 @@ export default function AdminTodosPage() {
         : t
     )
     setTodos(updated)
+    broadcastRef.current?.postMessage({ type: 'TODO_UPDATED' })
 
     try {
       const res = await fetch('/api/todos', {
@@ -174,6 +228,7 @@ export default function AdminTodosPage() {
         } else {
           toast.info(`Task "${todo.title}" marked as unverified`)
         }
+        broadcastRef.current?.postMessage({ type: 'TODO_UPDATED' })
       }
     } catch (e) {
       toast.error('Network error updating task')
@@ -199,6 +254,7 @@ export default function AdminTodosPage() {
         : t
     )
     setTodos(updated)
+    broadcastRef.current?.postMessage({ type: 'TODO_UPDATED' })
 
     try {
       const res = await fetch('/api/todos', {
@@ -214,6 +270,7 @@ export default function AdminTodosPage() {
       const data = await res.json()
       if (data.success) {
         toast.success('Admin note saved & task verified!')
+        broadcastRef.current?.postMessage({ type: 'TODO_UPDATED' })
       }
     } catch (e) {
       toast.error('Failed to save note')
@@ -230,10 +287,12 @@ export default function AdminTodosPage() {
 
     const updated = todos.filter((t) => t.id !== todo.id)
     setTodos(updated)
+    broadcastRef.current?.postMessage({ type: 'TODO_UPDATED' })
 
     try {
       await fetch(`/api/todos?id=${todo.id}`, { method: 'DELETE' })
       toast.success('Task removed')
+      broadcastRef.current?.postMessage({ type: 'TODO_UPDATED' })
     } catch (e) {
       toast.error('Failed to delete task')
       fetchTodos()

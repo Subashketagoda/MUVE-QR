@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import {
   CheckSquare,
@@ -20,6 +20,7 @@ import {
   Check,
 } from 'lucide-react'
 import { TodoRow, TodoPriority } from '@/types/database'
+import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
 export default function UserTasksPage() {
@@ -28,6 +29,8 @@ export default function UserTasksPage() {
   const [filter, setFilter] = useState<'all' | 'assigned' | 'pending' | 'completed' | 'reviewed'>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
+  const userRef = useRef<any>(null)
+  const broadcastRef = useRef<BroadcastChannel | null>(null)
 
   // New Task form state
   const [taskTitle, setTaskTitle] = useState('')
@@ -53,15 +56,68 @@ export default function UserTasksPage() {
       } catch (e) {}
     }
     setUser(currentUsr)
-    fetchTodos(currentUsr.id)
+    userRef.current = currentUsr
+    fetchTodos(currentUsr.id, true)
+
+    // 1. Cross-tab BroadcastChannel for 0ms instant sync
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('muve_todos_bus')
+        broadcastRef.current = bc
+        bc.onmessage = () => {
+          if (userRef.current) fetchTodos(userRef.current.id, false)
+        }
+      }
+    } catch (e) {}
+
+    // 2. Supabase Realtime WebSocket listener
+    const isSupabaseConfigured =
+      !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+
+    let channel: any = null
+    if (isSupabaseConfigured) {
+      try {
+        channel = supabase
+          .channel('user-tasks-realtime')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'todos' },
+            () => {
+              if (userRef.current) fetchTodos(userRef.current.id, false)
+            }
+          )
+          .subscribe()
+      } catch (e) {}
+    }
+
+    // 3. Fast auto-polling interval every 2.5s (reliable background sync across devices)
+    const interval = setInterval(() => {
+      if (userRef.current) fetchTodos(userRef.current.id, false)
+    }, 2500)
+
+    // 4. Focus & visibility listener
+    const onFocus = () => {
+      if (userRef.current) fetchTodos(userRef.current.id, false)
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+
+    return () => {
+      clearInterval(interval)
+      if (channel) supabase.removeChannel(channel)
+      if (broadcastRef.current) broadcastRef.current.close()
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
   }, [])
 
-  const fetchTodos = async (userId: string) => {
-    setLoading(true)
+  const fetchTodos = async (userId: string, isInitial = false) => {
+    if (isInitial) setLoading(true)
     let localTodos: TodoRow[] = []
     try {
       localTodos = JSON.parse(localStorage.getItem('muve_local_todos') || '[]')
-      if (localTodos.length > 0) {
+      if (localTodos.length > 0 && isInitial) {
         setTodos(localTodos)
       }
     } catch (e) {}
@@ -76,7 +132,7 @@ export default function UserTasksPage() {
     } catch (e) {
       console.error('Error fetching todos:', e)
     } finally {
-      setLoading(false)
+      if (isInitial) setLoading(false)
     }
   }
 
@@ -123,6 +179,7 @@ export default function UserTasksPage() {
       } else {
         toast.success('Task saved to checklist')
       }
+      broadcastRef.current?.postMessage({ type: 'TODO_UPDATED' })
     } catch (e) {
       toast.success('Task saved locally')
     } finally {
@@ -141,6 +198,7 @@ export default function UserTasksPage() {
     )
     setTodos(updatedList)
     localStorage.setItem('muve_local_todos', JSON.stringify(updatedList))
+    broadcastRef.current?.postMessage({ type: 'TODO_UPDATED' })
 
     try {
       await fetch('/api/todos', {
@@ -153,6 +211,7 @@ export default function UserTasksPage() {
       } else {
         toast.info('Marked as pending')
       }
+      broadcastRef.current?.postMessage({ type: 'TODO_UPDATED' })
     } catch (e) {
       console.error('Failed to update status on server:', e)
     }
@@ -165,10 +224,12 @@ export default function UserTasksPage() {
     const updated = todos.filter((t) => t.id !== id)
     setTodos(updated)
     localStorage.setItem('muve_local_todos', JSON.stringify(updated))
+    broadcastRef.current?.postMessage({ type: 'TODO_UPDATED' })
 
     try {
       await fetch(`/api/todos?id=${id}`, { method: 'DELETE' })
       toast.success('Task deleted')
+      broadcastRef.current?.postMessage({ type: 'TODO_UPDATED' })
     } catch (e) {
       console.error(e)
     }
