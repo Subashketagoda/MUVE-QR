@@ -189,5 +189,39 @@ BEGIN
   ) THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' 
+    AND schemaname = 'public' 
+    AND tablename = 'todos'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.todos;
+  END IF;
 END $$;
+
+-- ============================================================
+-- 11. TODOS / CHECKLIST TABLE
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.todos (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID,
+  user_name TEXT NOT NULL,
+  user_phone TEXT,
+  title TEXT NOT NULL,
+  description TEXT,
+  priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed')),
+  admin_reviewed BOOLEAN DEFAULT FALSE,
+  admin_notes TEXT,
+  reviewed_by TEXT,
+  reviewed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_todos_user_id ON public.todos(user_id);
+CREATE INDEX IF NOT EXISTS idx_todos_status ON public.todos(status);
+CREATE INDEX IF NOT EXISTS idx_todos_admin_reviewed ON public.todos(admin_reviewed);
+
 

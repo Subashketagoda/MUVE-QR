@@ -3,13 +3,14 @@
 import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, QrCode, History, User } from 'lucide-react'
+import { Home, QrCode, History, User, CheckSquare } from 'lucide-react'
 
 export const UserBottomNav: React.FC = () => {
   const pathname = usePathname()
 
   const navItems = [
     { href: '/app/home', label: 'Home', icon: Home },
+    { href: '/app/tasks', label: 'Tasks', icon: CheckSquare },
     { href: '/app/scan', label: 'Scan', icon: QrCode, isScanBtn: true },
     { href: '/app/history', label: 'History', icon: History },
     { href: '/app/profile', label: 'Profile', icon: User },

@@ -17,13 +17,18 @@ import {
   Activity,
   ArrowUpRight,
   CheckCircle2,
+  CheckSquare,
+  Check,
+  Plus,
 } from 'lucide-react'
+import { TodoRow } from '@/types/database'
 
 export default function UserHomePage() {
   const [user, setUser] = useState<any>(null)
   const [scansToday, setScansToday] = useState(0)
   const [lastScan, setLastScan] = useState<any>(null)
   const [recentScans, setRecentScans] = useState<any[]>([])
+  const [todos, setTodos] = useState<TodoRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -42,7 +47,38 @@ export default function UserHomePage() {
     }
     setUser(currentUsr)
     fetchUserScans(currentUsr.id)
+    fetchUserTodos(currentUsr.id)
   }, [])
+
+  const fetchUserTodos = async (userId: string) => {
+    try {
+      const res = await fetch(`/api/todos?userId=${userId}&t=${Date.now()}`, { cache: 'no-store' })
+      const data = await res.json()
+      if (data.success && Array.isArray(data.todos)) {
+        setTodos(data.todos.slice(0, 4))
+        localStorage.setItem('muve_local_todos', JSON.stringify(data.todos))
+      }
+    } catch (e) {
+      try {
+        const local = JSON.parse(localStorage.getItem('muve_local_todos') || '[]')
+        setTodos(local.slice(0, 4))
+      } catch (err) {}
+    }
+  }
+
+  const handleToggleTodo = async (todo: TodoRow) => {
+    const nextStatus = todo.status === 'completed' ? 'pending' : 'completed'
+    setTodos((prev) =>
+      prev.map((t) => (t.id === todo.id ? { ...t, status: nextStatus } : t))
+    )
+    try {
+      await fetch('/api/todos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: todo.id, status: nextStatus }),
+      })
+    } catch (e) {}
+  }
 
   const fetchUserScans = async (userId: string) => {
     let localList: any[] = []
@@ -239,6 +275,94 @@ export default function UserHomePage() {
             <Download className="w-4 h-4" />
           </div>
         </Link>
+
+        {/* User Daily Checklist / To-Do Card */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <CheckSquare className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-xs">Daily Checklist & Tasks</h3>
+                <p className="text-[10px] text-slate-400">Admin verified inspection tasks</p>
+              </div>
+            </div>
+            <Link
+              href="/app/tasks"
+              className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-lg"
+            >
+              <span>Open List</span>
+              <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {todos.length === 0 ? (
+            <div className="p-3 bg-slate-50 rounded-xl text-center">
+              <p className="text-xs text-slate-500 font-medium">No tasks logged yet</p>
+              <Link
+                href="/app/tasks"
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 mt-1"
+              >
+                <Plus className="w-3 h-3 stroke-[3]" />
+                <span>Add first task</span>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {todos.map((todo) => {
+                const isDone = todo.status === 'completed'
+                return (
+                  <div
+                    key={todo.id}
+                    onClick={() => handleToggleTodo(todo)}
+                    className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50 transition cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`w-5 h-5 rounded-md flex items-center justify-center transition flex-shrink-0 ${
+                          isDone
+                            ? 'bg-blue-600 text-white'
+                            : 'border-2 border-slate-300'
+                        }`}
+                      >
+                        {isDone && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`text-xs font-semibold truncate ${
+                              isDone ? 'line-through text-slate-400' : 'text-slate-800'
+                            }`}
+                          >
+                            {todo.title}
+                          </span>
+                          {todo.assigned_by && (
+                            <span className="text-[9px] font-extrabold bg-blue-100 text-blue-700 px-1 py-0.2 rounded border border-blue-200 flex-shrink-0">
+                              Admin
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {todo.admin_reviewed ? (
+                        <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                          ✓ Admin Checked
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-semibold text-slate-400">
+                          {isDone ? 'Done' : 'Pending'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Recent Scans Section */}
         <div className="space-y-3 pt-1">

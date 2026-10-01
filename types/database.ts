@@ -9,6 +9,8 @@ export type UserStatus = 'active' | 'inactive' | 'suspended'
 export type QRStatus = 'active' | 'inactive' | 'archived'
 export type ScanStatus = 'success' | 'rejected' | 'invalid' | 'inactive' | 'cooldown' | 'geofence_fail'
 export type NotificationType = 'scan' | 'alert' | 'system' | 'invalid_scan'
+export type TodoPriority = 'low' | 'medium' | 'high' | 'urgent'
+export type TodoStatus = 'pending' | 'in_progress' | 'completed'
 
 export interface Database {
   public: {
@@ -197,6 +199,54 @@ export interface Database {
           total_scans: number | null
         }
       }
+      todos: {
+        Row: {
+          id: string
+          user_id: string
+          user_name: string
+          user_phone: string | null
+          title: string
+          description: string | null
+          priority: TodoPriority
+          status: TodoStatus
+          assigned_by: string | null
+          admin_reviewed: boolean
+          admin_notes: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          user_name: string
+          user_phone?: string | null
+          title: string
+          description?: string | null
+          priority?: TodoPriority
+          status?: TodoStatus
+          assigned_by?: string | null
+          admin_reviewed?: boolean
+          admin_notes?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          title?: string
+          description?: string | null
+          priority?: TodoPriority
+          status?: TodoStatus
+          assigned_by?: string | null
+          admin_reviewed?: boolean
+          admin_notes?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          updated_at?: string
+        }
+      }
     }
     Functions: {
       is_admin: {
@@ -220,6 +270,7 @@ export type ScanLogRow = Database['public']['Tables']['scan_logs']['Row']
 export type NotificationRow = Database['public']['Tables']['notifications']['Row']
 export type AuditLogRow = Database['public']['Tables']['audit_logs']['Row']
 export type SettingRow = Database['public']['Tables']['settings']['Row']
+export type TodoRow = Database['public']['Tables']['todos']['Row']
 
 // Enriched scan log (with joined user and QR data)
 export type ScanLogEnriched = ScanLogRow & {

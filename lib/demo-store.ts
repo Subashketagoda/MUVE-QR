@@ -3,7 +3,7 @@
 // Fallback state store when Supabase credentials are not connected
 // ============================================================
 
-import { QRCodeRow, ScanLogRow, UserRow, AuditLogRow, NotificationRow, AppSettings } from '@/types/database'
+import { QRCodeRow, ScanLogRow, UserRow, AuditLogRow, NotificationRow, AppSettings, TodoRow } from '@/types/database'
 
 export let INITIAL_USERS: UserRow[] = [
   {
@@ -114,3 +114,55 @@ export let INITIAL_SETTINGS: AppSettings = {
   notification_sound_enabled: 'true',
   logo_url: '',
 }
+
+export let INITIAL_TODOS: TodoRow[] = [
+  {
+    id: 'todo_001',
+    user_id: '00000000-0000-0000-0000-000000000002',
+    user_name: 'User 01',
+    user_phone: '077 111 1111',
+    title: 'Inspect Sector 4 Emergency Exit QR Code',
+    description: 'Ensure QR sticker is clean and readable, verify perimeter lighting.',
+    priority: 'high',
+    status: 'completed',
+    admin_reviewed: true,
+    admin_notes: 'Verified scan logs match timestamp. Checked & approved.',
+    reviewed_by: 'System Admin',
+    reviewed_at: new Date(Date.now() - 2 * 3600000).toISOString(),
+    created_at: new Date(Date.now() - 5 * 3600000).toISOString(),
+    updated_at: new Date(Date.now() - 2 * 3600000).toISOString(),
+  },
+  {
+    id: 'todo_002',
+    user_id: '00000000-0000-0000-0000-000000000002',
+    user_name: 'User 01',
+    user_phone: '077 111 1111',
+    title: 'Report damaged QR bracket at Loading Dock B',
+    description: 'Bracket is loose due to forklift vibration. Needs re-mounting before next shift.',
+    priority: 'urgent',
+    status: 'pending',
+    admin_reviewed: false,
+    admin_notes: null,
+    reviewed_by: null,
+    reviewed_at: null,
+    created_at: new Date(Date.now() - 1 * 3600000).toISOString(),
+    updated_at: new Date(Date.now() - 1 * 3600000).toISOString(),
+  },
+  {
+    id: 'todo_003',
+    user_id: 'usr_user_002',
+    user_name: 'User 02',
+    user_phone: '077 222 2222',
+    title: 'Daily patrol checklist for Main Entrance & Reception',
+    description: 'Verify all staff and visitor badges before shift handover.',
+    priority: 'medium',
+    status: 'completed',
+    admin_reviewed: false,
+    admin_notes: null,
+    reviewed_by: null,
+    reviewed_at: null,
+    created_at: new Date(Date.now() - 4 * 3600000).toISOString(),
+    updated_at: new Date(Date.now() - 30 * 60000).toISOString(),
+  },
+]
+

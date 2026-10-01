@@ -14,6 +14,7 @@ import {
   Settings,
   ShieldAlert,
   X,
+  CheckSquare,
 } from 'lucide-react'
 
 interface AdminSidebarProps {
@@ -27,6 +28,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, setMobil
   const navItems = [
     { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/live-scans', label: 'Live Scans', icon: Radio, badge: 'LIVE' },
+    { href: '/admin/todos', label: 'Tasks & Checklist', icon: CheckSquare },
     { href: '/admin/scan-history', label: 'Scan History', icon: History },
     { href: '/admin/qr-codes', label: 'QR Codes', icon: QrCode },
     { href: '/admin/users', label: 'Users', icon: Users },

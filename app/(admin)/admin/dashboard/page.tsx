@@ -11,7 +11,13 @@ import {
   Clock,
   Radio,
   PlusCircle,
+  CheckSquare,
+  ShieldCheck,
+  ChevronRight,
+  Check,
 } from 'lucide-react'
+import { TodoRow } from '@/types/database'
+import { toast } from 'sonner'
 import {
   AreaChart,
   Area,
@@ -31,11 +37,46 @@ const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899']
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState<any>(null)
+  const [todos, setTodos] = useState<TodoRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetchAnalytics()
+    fetchDashboardTodos()
   }, [])
+
+  const fetchDashboardTodos = async () => {
+    try {
+      const res = await fetch('/api/todos')
+      const json = await res.json()
+      if (json.success && Array.isArray(json.todos)) {
+        setTodos(json.todos.slice(0, 5))
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleQuickCheck = async (todo: TodoRow) => {
+    const nextReviewed = !todo.admin_reviewed
+    setTodos((prev) =>
+      prev.map((t) => (t.id === todo.id ? { ...t, admin_reviewed: nextReviewed } : t))
+    )
+    try {
+      await fetch('/api/todos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: todo.id,
+          admin_reviewed: nextReviewed,
+          reviewed_by: nextReviewed ? 'System Admin' : null,
+        }),
+      })
+      toast.success(nextReviewed ? `Verified "${todo.title}"` : `Unchecked "${todo.title}"`)
+    } catch (e) {
+      toast.error('Failed to update')
+    }
+  }
 
   const fetchAnalytics = async () => {
     try {
@@ -252,6 +293,107 @@ export default function AdminDashboardPage() {
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
+
+      {/* User Checklist & Tasks Review Section on Dashboard */}
+      <div className="card p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+              <CheckSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-slate-900 text-base">User Inspection Tasks & Checklist</h3>
+                <span className="text-[10px] font-extrabold bg-[#D4FC04] text-black px-2 py-0.5 rounded-full">
+                  Admin Verification
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Tasks logged by mobile users awaiting admin check and sign-off
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/admin/todos"
+            className="btn btn-secondary btn-sm flex items-center gap-1.5"
+          >
+            <span>View All Tasks</span>
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        {todos.length === 0 ? (
+          <div className="p-6 bg-slate-50 rounded-xl text-center">
+            <p className="text-sm text-slate-500 font-medium">No tasks logged by users yet.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {todos.map((todo) => {
+              const isDone = todo.status === 'completed'
+              const isReviewed = todo.admin_reviewed
+
+              return (
+                <div
+                  key={todo.id}
+                  className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-black text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                      {todo.user_name.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm text-slate-900">{todo.title}</span>
+                        <span className="text-xs text-slate-400">• {todo.user_name}</span>
+                        <span
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            todo.priority === 'urgent'
+                              ? 'bg-rose-100 text-rose-800'
+                              : todo.priority === 'high'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}
+                        >
+                          {todo.priority}
+                        </span>
+                      </div>
+                      {todo.description && (
+                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                          {todo.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 self-end sm:self-center">
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded ${
+                        isDone ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      User: {isDone ? 'Done' : 'Pending'}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => handleQuickCheck(todo)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
+                        isReviewed
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100'
+                          : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm'
+                      }`}
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>{isReviewed ? '✓ Verified' : 'Check & Verify'}</span>
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
