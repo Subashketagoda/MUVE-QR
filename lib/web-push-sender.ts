@@ -25,16 +25,41 @@ export interface PushNotificationPayload {
   tag?: string
   category?: string
   priority?: string
+  targetUserId?: string
 }
 
 /**
- * Dispatches an instant Web Push notification directly to all subscribed staff devices.
- * This triggers the device lock-screen display, sound, and vibration via the Service Worker.
+ * Dispatches a Web Push notification to subscribed staff devices.
+ * If targetUserId is provided (and not 'all'), it ONLY dispatches to that specific user's registered devices.
+ * If targetUserId is 'all' or omitted, it broadcasts to all staff devices.
  */
-export async function sendPushToAllStaff(payload: PushNotificationPayload) {
+export async function sendPushToAllStaff(payload: PushNotificationPayload, targetUserId?: string) {
   const subscriptions = await getAllPushSubscriptions()
   if (!subscriptions || subscriptions.length === 0) {
     console.log('[WebPush] No staff push subscriptions registered yet.')
+    return { success: true, count: 0, sent: 0 }
+  }
+
+  const effectiveTarget = targetUserId || payload.targetUserId
+
+  // Filter subscriptions if a specific user is targeted
+  const targetSubs = subscriptions.filter((sub) => {
+    if (!effectiveTarget || effectiveTarget === 'all') return true
+
+    const normTarget =
+      effectiveTarget === 'usr_user_001'
+        ? '00000000-0000-0000-0000-000000000002'
+        : effectiveTarget
+    const normSubUser =
+      sub.userId === 'usr_user_001'
+        ? '00000000-0000-0000-0000-000000000002'
+        : sub.userId
+
+    return normSubUser === normTarget
+  })
+
+  if (targetSubs.length === 0) {
+    console.log(`[WebPush] No subscriptions registered for target user: ${effectiveTarget}`)
     return { success: true, count: 0, sent: 0 }
   }
 
@@ -45,11 +70,12 @@ export async function sendPushToAllStaff(payload: PushNotificationPayload) {
     tag: payload.tag || `muve-alert-${Date.now()}`,
     category: payload.category || 'maintenance',
     priority: payload.priority || 'high',
+    targetUserId: effectiveTarget,
     timestamp: Date.now(),
   })
 
   const results = await Promise.allSettled(
-    subscriptions.map(async (sub) => {
+    targetSubs.map(async (sub) => {
       try {
         await webpush.sendNotification(
           {
@@ -76,6 +102,8 @@ export async function sendPushToAllStaff(payload: PushNotificationPayload) {
   const successful = results.filter((r) => r.status === 'fulfilled').length
   const failed = results.filter((r) => r.status === 'rejected').length
 
-  console.log(`[WebPush] Dispatched to staff: ${successful} success, ${failed} failed`)
-  return { success: true, count: subscriptions.length, sent: successful }
+  console.log(`[WebPush] Dispatched: ${successful} success, ${failed} failed for target: ${effectiveTarget || 'all'}`)
+  return { success: true, count: targetSubs.length, sent: successful }
 }
+
+export const sendPushToStaff = sendPushToAllStaff

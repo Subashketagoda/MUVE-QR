@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
 
     const saved = await addTodoToStore(newTodo)
 
-    // 1. Dispatch push notification to all mobile phones
+    // 1. Dispatch push notification ONLY to targeted staff member (or all if user_id === 'all')
     try {
       await sendPushToAllStaff({
         title: `📋 New Task: ${title.trim()}`,
@@ -98,25 +98,28 @@ export async function POST(req: NextRequest) {
         url: '/app/tasks',
         tag: `muve-task-${saved.id}`,
         priority: priority || 'medium',
+        targetUserId: newTodo.user_id,
       })
     } catch (pushErr) {
       console.warn('[Push] Error sending task push to staff:', pushErr)
     }
 
-    // 2. Insert into Supabase notifications table
-    try {
-      const isSupabaseConfigured =
-        !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
-        !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
-      if (isSupabaseConfigured) {
-        await (supabaseAdmin as any).from('notifications').insert({
-          type: 'alert',
-          title: `📋 Task: ${title.trim()}`,
-          message: description ? description.trim() : `Assigned by ${assigned_by || 'Admin'}`,
-          is_read: false,
-        })
-      }
-    } catch (e) {}
+    // 2. Insert into global Supabase notifications table ONLY if this is a broadcast for ALL staff
+    if (newTodo.user_id === 'all') {
+      try {
+        const isSupabaseConfigured =
+          !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+          !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+        if (isSupabaseConfigured) {
+          await (supabaseAdmin as any).from('notifications').insert({
+            type: 'alert',
+            title: `📋 Task: ${title.trim()}`,
+            message: description ? description.trim() : `Assigned by ${assigned_by || 'Admin'}`,
+            is_read: false,
+          })
+        }
+      } catch (e) {}
+    }
 
     return NextResponse.json({ success: true, todo: saved })
   } catch (err: any) {

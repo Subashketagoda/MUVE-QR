@@ -232,11 +232,40 @@ export function LockScreenNotificationManager() {
     }, 1500)
   }
 
+  const getCurrentUserId = useCallback(() => {
+    try {
+      const saved = localStorage.getItem('muve_user')
+      if (saved) {
+        const u = JSON.parse(saved)
+        return u.id === 'usr_user_001' ? '00000000-0000-0000-0000-000000000002' : u.id
+      }
+    } catch (e) {}
+    return '00000000-0000-0000-0000-000000000002'
+  }, [])
+
   // 8. Handle Incoming Alert Detection (Realtime + Polling fallback)
   const handleNewAlert = useCallback(
-    (alert: { id?: string; title: string; message: string; created_at?: string; is_read?: boolean }) => {
+    (alert: {
+      id?: string
+      title: string
+      message: string
+      created_at?: string
+      is_read?: boolean
+      target_user_id?: string
+      user_id?: string
+    }) => {
       // NEVER trigger alerts for already-done or read tasks
       if (alert.is_read) return
+
+      // If targeted to a specific staff member, only display if it matches current user
+      const target = alert.target_user_id || alert.user_id
+      if (target && target !== 'all') {
+        const currentId = getCurrentUserId()
+        const normTarget = target === 'usr_user_001' ? '00000000-0000-0000-0000-000000000002' : target
+        if (currentId !== normTarget) {
+          return
+        }
+      }
 
       const alertId = alert.id || `${alert.title}_${alert.created_at || Date.now()}`
       if (seenAlertIdsRef.current.has(alertId)) return
@@ -250,7 +279,7 @@ export function LockScreenNotificationManager() {
       // Set in-app floating emergency banner
       setIncomingAlert(alert)
     },
-    [triggerLockScreenNotification, saveSeenIds]
+    [triggerLockScreenNotification, saveSeenIds, getCurrentUserId]
   )
 
   // 9. Subscribe to Supabase Realtime 'notifications' table
