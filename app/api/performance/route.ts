@@ -147,6 +147,7 @@ export async function GET(req: NextRequest) {
           uIntervalCount > 0 ? Math.round((uIntervalMs / uIntervalCount / 60000) * 10) / 10 : null
 
         const lastScan = uScans[0]?.scanned_at || null
+        const lastLocation = uScans[0]?.location_name || uScans[0]?.qr_name || null
 
         // Performance Score
         let score = Math.round(uCoveragePct * 0.7 + (uScans.length > 0 ? (uSuccess / uScans.length) * 30 : 0))
@@ -168,6 +169,7 @@ export async function GET(req: NextRequest) {
           score,
           rating,
           last_scanned_at: lastScan,
+          last_scanned_location: lastLocation,
         }
       })
       .sort((a, b) => b.total_scans - a.total_scans || b.score - a.score)

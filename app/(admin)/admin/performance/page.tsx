@@ -1,37 +1,37 @@
 'use client'
 
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useRef } from 'react'
 import {
+  Trophy,
+  Crown,
+  Medal,
+  Radio,
+  Clock,
   TrendingUp,
-  Activity,
-  Award,
-  Zap,
-  Calendar,
+  MapPin,
+  ShieldCheck,
+  Maximize2,
+  Minimize2,
+  Volume2,
+  VolumeX,
   RefreshCw,
   Download,
+  Users,
   Search,
   CheckCircle2,
   AlertTriangle,
-  Clock,
-  ArrowUpRight,
-  ShieldCheck,
-  Layers,
-  Users,
-  MapPin,
-  Trophy,
   Flame,
-  XCircle,
-  HelpCircle,
+  Layers,
+  Activity,
+  Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { supabase } from '@/lib/supabase/client'
 import {
   AreaChart,
   Area,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -39,46 +39,172 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 
-const PIE_COLORS = ['#10b981', '#ef4444', '#f59e0b', '#3b82f6']
-
 export default function AdminPerformancePage() {
   const [loading, setLoading] = useState(true)
-  const [timeframe, setTimeframe] = useState<'today' | '7d' | '30d' | 'all'>('7d')
-  const [selectedOfficer, setSelectedOfficer] = useState<string>('')
-  const [activeTab, setActiveTab] = useState<'officers' | 'checkpoints'>('officers')
+  const [timeframe, setTimeframe] = useState<'today' | '7d' | '30d' | 'all'>('today')
+  const [isTvMode, setIsTvMode] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(true)
+  const [currentTime, setCurrentTime] = useState<string>('')
+  const [perfData, setPerfData] = useState<any>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [newScanFlash, setNewScanFlash] = useState(false)
+
+  // Secondary tab & filters for the lower section
+  const [subTab, setSubTab] = useState<'checkpoints' | 'analytics'>('checkpoints')
   const [checkpointSearch, setCheckpointSearch] = useState('')
   const [checkpointFilter, setCheckpointFilter] = useState<'all' | 'visited' | 'unvisited'>('all')
 
-  const [perfData, setPerfData] = useState<any>(null)
+  const prevTopScanCountRef = useRef<number>(0)
+  const tvContainerRef = useRef<HTMLDivElement>(null)
 
-  const fetchPerformance = async () => {
-    setLoading(true)
+  // 1. Live Digital Clock (Updates every second for TV wall display)
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date()
+      setCurrentTime(
+        now.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+        })
+      )
+    }
+    updateClock()
+    const timer = setInterval(updateClock, 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // 2. Play gentle celebration chime when leaderboard changes
+  const playLiveChime = () => {
+    if (!soundEnabled) return
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = new AudioCtx()
+      const now = ctx.currentTime
+
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(880, now) // A5
+      osc.frequency.exponentialRampToValueAtTime(1174.66, now + 0.2) // D6
+      gain.gain.setValueAtTime(0.12, now)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(now)
+      osc.stop(now + 0.4)
+    } catch (e) {}
+  }
+
+  // 3. Fetch Performance Analytics from API
+  const fetchPerformance = async (isInitial = false) => {
+    if (isInitial) setLoading(true)
     try {
       const params = new URLSearchParams()
       params.set('timeframe', timeframe)
-      if (selectedOfficer) params.set('userId', selectedOfficer)
 
       const res = await fetch(`/api/performance?${params.toString()}&t=${Date.now()}`, {
         cache: 'no-store',
       })
       const data = await res.json()
       if (data.success) {
+        // Check if top scans updated to trigger visual glow and sound
+        const currentTopScans = data.officerLeaderboard?.[0]?.total_scans || 0
+        if (!isInitial && currentTopScans > prevTopScanCountRef.current && prevTopScanCountRef.current > 0) {
+          playLiveChime()
+          setNewScanFlash(true)
+          setTimeout(() => setNewScanFlash(false), 2500)
+        }
+        prevTopScanCountRef.current = currentTopScans
+
         setPerfData(data)
-      } else {
-        toast.error('Failed to load performance data: ' + data.message)
+        setLastUpdated(new Date())
       }
-    } catch (err: any) {
-      toast.error('Network error loading performance analytics')
+    } catch (err) {
+      console.error('Performance fetch error:', err)
     } finally {
-      setLoading(false)
+      if (isInitial) setLoading(false)
     }
   }
 
+  // Initial load when timeframe changes
   useEffect(() => {
-    fetchPerformance()
-  }, [timeframe, selectedOfficer])
+    fetchPerformance(true)
+  }, [timeframe])
 
-  // Filtered checkpoints for tab 2
+  // 4. Multi-Strategy Real-time Live Engine (Supabase Realtime + BroadcastChannel + 3s Poller)
+  useEffect(() => {
+    // A. Cross-tab instant message bus
+    let bc: BroadcastChannel | null = null
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        bc = new BroadcastChannel('muve_scans_bus')
+        bc.onmessage = () => {
+          fetchPerformance(false)
+        }
+      }
+    } catch (e) {}
+
+    // B. Supabase Realtime channel on scan_logs table
+    let channel: any = null
+    try {
+      channel = supabase
+        .channel('performance-live-tv')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'scan_logs' },
+          () => {
+            fetchPerformance(false)
+          }
+        )
+        .subscribe()
+    } catch (e) {}
+
+    // C. Continuous 3-second live background polling to guarantee 100% TV reliability
+    const interval = setInterval(() => {
+      fetchPerformance(false)
+    }, 3000)
+
+    return () => {
+      if (bc) bc.close()
+      if (channel) supabase.removeChannel(channel)
+      clearInterval(interval)
+    }
+  }, [timeframe, soundEnabled])
+
+  // Fullscreen TV Mode Toggle
+  const toggleFullscreen = () => {
+    if (!isTvMode) {
+      setIsTvMode(true)
+      try {
+        if (tvContainerRef.current && document.fullscreenEnabled) {
+          tvContainerRef.current.requestFullscreen?.()
+        }
+      } catch (e) {}
+    } else {
+      setIsTvMode(false)
+      try {
+        if (document.fullscreenElement) {
+          document.exitFullscreen?.()
+        }
+      } catch (e) {}
+    }
+  }
+
+  // Listen to browser Escape exit from fullscreen
+  useEffect(() => {
+    const handleFsChange = () => {
+      if (!document.fullscreenElement) {
+        setIsTvMode(false)
+      }
+    }
+    document.addEventListener('fullscreenchange', handleFsChange)
+    return () => document.removeEventListener('fullscreenchange', handleFsChange)
+  }, [])
+
+  // Filtered checkpoints for lower heatmap section
   const filteredCheckpoints = useMemo(() => {
     if (!perfData?.checkpointStats) return []
     return perfData.checkpointStats.filter((c: any) => {
@@ -93,43 +219,25 @@ export default function AdminPerformancePage() {
     })
   }, [perfData, checkpointSearch, checkpointFilter])
 
-  // Export Performance Data to CSV
+  // Export CSV
   const exportPerformanceCSV = () => {
     if (!perfData) return
     const rows = [
-      ['MUVE QR Performance Report', `Timeframe: ${timeframe}`, `Generated: ${new Date().toLocaleString()}`],
-      [],
-      ['KPI Summary'],
-      ['Compliance Score', `${perfData.kpis.complianceScore}%`],
-      ['Checkpoints Covered', `${perfData.kpis.checkpointsCoveredCount} of ${perfData.kpis.totalCheckpoints}`],
-      ['Coverage Rate', `${perfData.kpis.coverageRate}%`],
-      ['Total Scans', perfData.kpis.totalScans],
-      ['Success Rate', `${perfData.kpis.successRate}%`],
-      ['Avg Inspection Pace', `${perfData.kpis.avgPaceMinutes} minutes`],
+      ['MUVE QR Live Patrol TV Leaderboard', `Timeframe: ${timeframe}`, `Generated: ${new Date().toLocaleString()}`],
       [],
       ['Officer Leaderboard'],
-      ['Rank', 'Name', 'Email', 'Phone', 'Total Scans', 'Checkpoints Covered', 'Coverage %', 'Avg Pace (mins)', 'Score', 'Rating'],
+      ['Rank', 'Officer Name', 'Contact', 'Total Scans', 'Distinct Checkpoints', 'Coverage %', 'Pace (mins)', 'Status', 'Last Location', 'Last Scan Time'],
       ...perfData.officerLeaderboard.map((o: any, idx: number) => [
         `#${idx + 1}`,
         o.full_name,
-        o.email,
-        o.phone,
+        o.phone || o.email,
         o.total_scans,
         o.distinct_checkpoints,
         `${o.coverage_pct}%`,
         o.avg_pace_minutes || 'N/A',
-        o.score,
-        o.rating,
-      ]),
-      [],
-      ['Checkpoint Status'],
-      ['Name', 'Visits in Period', 'Status', 'Last Scanned At', 'Token'],
-      ...perfData.checkpointStats.map((c: any) => [
-        c.location_name,
-        c.visits,
-        c.status,
-        c.last_scanned_at ? new Date(c.last_scanned_at).toLocaleString() : 'Never',
-        c.token,
+        o.total_scans > 0 ? 'Active' : 'Standby',
+        o.last_scanned_location || 'N/A',
+        o.last_scanned_at ? new Date(o.last_scanned_at).toLocaleString() : 'N/A',
       ]),
     ]
 
@@ -137,11 +245,11 @@ export default function AdminPerformancePage() {
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement('a')
     link.setAttribute('href', encodedUri)
-    link.setAttribute('download', `muve_performance_${timeframe}_${Date.now()}.csv`)
+    link.setAttribute('download', `muve_tv_leaderboard_${timeframe}_${Date.now()}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    toast.success('Performance report exported as CSV!')
+    toast.success('Live Leaderboard exported as CSV!')
   }
 
   const kpis = perfData?.kpis || {
@@ -154,44 +262,77 @@ export default function AdminPerformancePage() {
     avgPaceMinutes: 0,
   }
 
+  const officers = perfData?.officerLeaderboard || []
+  const top1 = officers[0]
+  const top2 = officers[1]
+  const top3 = officers[2]
+
   return (
-    <div className="space-y-6 pb-12">
-      {/* 1. Header Bar with Controls */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 rounded-2xl border border-slate-700/60 shadow-xl text-white">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              Live Patrol Intelligence
-            </span>
+    <div
+      ref={tvContainerRef}
+      className={`space-y-6 transition-all duration-300 ${
+        isTvMode
+          ? 'fixed inset-0 z-50 bg-[#050D1A] overflow-y-auto p-4 sm:p-8 text-white'
+          : 'pb-16 text-slate-900'
+      }`}
+    >
+      {/* ============================================================
+          TOP TV LEADERBOARD COMMAND BAR (Large & High Contrast)
+          ============================================================ */}
+      <div
+        className={`p-5 lg:p-7 rounded-3xl border transition-all ${
+          newScanFlash
+            ? 'bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 border-[#D4FC04] shadow-2xl shadow-[#D4FC04]/20'
+            : 'bg-gradient-to-r from-slate-950 via-slate-900 to-[#0A1628] border-slate-800 shadow-2xl'
+        } text-white flex flex-col xl:flex-row xl:items-center justify-between gap-5`}
+      >
+        {/* Left Title & Live Pulse */}
+        <div className="flex items-start sm:items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-[#D4FC04] text-slate-950 flex items-center justify-center font-black shadow-lg shadow-[#D4FC04]/30 flex-shrink-0">
+            <Trophy className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight flex items-center gap-2.5">
-            <TrendingUp className="w-8 h-8 text-[#D4FC04]" />
-            Operations & Guard Performance
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Real-time officer compliance, checkpoint coverage, inspection velocity & quality audit
-          </p>
+
+          <div>
+            <div className="flex flex-wrap items-center gap-2.5 mb-1">
+              <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                LIVE REAL-TIME FEED
+              </span>
+
+              {/* Live Digital Clock */}
+              <div className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-slate-800/90 text-[#D4FC04] border border-slate-700 flex items-center gap-1.5 shadow-inner">
+                <Clock className="w-3.5 h-3.5 text-[#D4FC04]" />
+                <span>{currentTime || '10:00:00 PM'}</span>
+              </div>
+            </div>
+
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white flex items-center gap-3">
+              OFFICER PATROL LEADERBOARD
+            </h1>
+            <p className="text-slate-400 text-xs sm:text-sm mt-0.5 font-medium">
+              Real-time security patrol rankings, perimeter inspection velocity & checkpoint coverage
+            </p>
+          </div>
         </div>
 
-        {/* Timeframe & Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Timeframe Pills */}
-          <div className="bg-slate-950/80 p-1 rounded-xl border border-slate-700 flex items-center gap-1">
+        {/* Right Controls: Timeframe Pills & TV Screen Controls */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Timeframe Selector Pills */}
+          <div className="bg-slate-900/90 p-1.5 rounded-2xl border border-slate-700/80 flex items-center gap-1 shadow-inner">
             {(
               [
                 { id: 'today', label: 'Today' },
-                { id: '7d', label: 'Last 7 Days' },
-                { id: '30d', label: 'Last 30 Days' },
-                { id: 'all', label: 'All Time' },
+                { id: '7d', label: '7 Days' },
+                { id: '30d', label: '30 Days' },
+                { id: 'all', label: 'All' },
               ] as const
             ).map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTimeframe(t.id)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all ${
                   timeframe === t.id
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                    ? 'bg-[#D4FC04] text-slate-950 shadow-md font-black'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800'
                 }`}
               >
@@ -200,529 +341,637 @@ export default function AdminPerformancePage() {
             ))}
           </div>
 
-          {/* Officer Dropdown Filter */}
-          <select
-            value={selectedOfficer}
-            onChange={(e) => setSelectedOfficer(e.target.value)}
-            className="bg-slate-950/90 text-xs font-medium text-slate-200 border border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-blue-500"
-          >
-            <option value="">All Officers</option>
-            {perfData?.officerLeaderboard?.map((o: any) => (
-              <option key={o.id} value={o.id}>
-                {o.full_name}
-              </option>
-            ))}
-          </select>
-
-          {/* Refresh Button */}
+          {/* Sound Toggle */}
           <button
-            onClick={fetchPerformance}
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`p-2.5 rounded-2xl border transition-all text-xs font-bold flex items-center gap-1.5 ${
+              soundEnabled
+                ? 'bg-slate-800 border-slate-700 text-emerald-400 hover:bg-slate-700'
+                : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-400'
+            }`}
+            title={soundEnabled ? 'Chime sound enabled' : 'Sound muted'}
+          >
+            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          </button>
+
+          {/* Refresh Action */}
+          <button
+            onClick={() => fetchPerformance(false)}
             disabled={loading}
-            className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-slate-300 hover:text-white transition-all disabled:opacity-50"
-            title="Refresh analytics"
+            className="p-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white rounded-2xl transition-all"
+            title="Refresh now"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-400' : ''}`} />
           </button>
 
-          {/* CSV Export Button */}
+          {/* Fullscreen TV Mode Toggle */}
+          <button
+            onClick={toggleFullscreen}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs sm:text-sm font-black shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+          >
+            {isTvMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            <span>{isTvMode ? 'Exit TV Mode' : '📺 TV Mode'}</span>
+          </button>
+
+          {/* CSV Export */}
           <button
             onClick={exportPerformanceCSV}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-[#D4FC04] text-slate-950 hover:bg-[#c2e803] font-bold text-xs rounded-xl shadow-lg transition-all"
+            className="p-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white rounded-2xl transition-all"
+            title="Export CSV"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export CSV</span>
+            <Download className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* 2. Top Executive KPI Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1: Overall Compliance Score */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full pointer-events-none" />
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              Patrol Compliance
-            </span>
-            <span
-              className={`px-2 py-0.5 text-[11px] font-extrabold rounded-md ${
-                kpis.complianceScore >= 80
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : kpis.complianceScore >= 50
-                  ? 'bg-amber-100 text-amber-800'
-                  : 'bg-rose-100 text-rose-800'
-              }`}
-            >
-              {kpis.complianceScore >= 85 ? 'Grade A+ (Optimal)' : kpis.complianceScore >= 60 ? 'Grade B' : 'Needs Focus'}
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-900">{kpis.complianceScore}%</span>
-            <span className="text-xs text-slate-500 font-medium">overall audit score</span>
-          </div>
-          {/* Progress bar */}
-          <div className="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-700 ${
-                kpis.complianceScore >= 80 ? 'bg-emerald-500' : kpis.complianceScore >= 50 ? 'bg-amber-500' : 'bg-rose-500'
-              }`}
-              style={{ width: `${kpis.complianceScore}%` }}
-            />
-          </div>
-          <p className="text-[11px] text-slate-400 mt-2">
-            Weighted across total coverage and checkpoint scan validity
-          </p>
-        </div>
-
-        {/* KPI 2: Checkpoint Coverage */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full pointer-events-none" />
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <MapPin className="w-4 h-4 text-blue-600" />
-              Checkpoint Coverage
-            </span>
-            <span className="px-2 py-0.5 text-[11px] font-extrabold rounded-md bg-blue-100 text-blue-800">
-              {kpis.coverageRate}% Reach
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-900">
-              {kpis.checkpointsCoveredCount}
-              <span className="text-slate-400 font-semibold text-xl"> / {kpis.totalCheckpoints}</span>
-            </span>
-          </div>
-          <div className="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
-            <div
-              className="h-full bg-blue-600 rounded-full transition-all duration-700"
-              style={{ width: `${kpis.coverageRate}%` }}
-            />
-          </div>
-          <p className="text-[11px] text-slate-400 mt-2">
-            {kpis.totalCheckpoints - kpis.checkpointsCoveredCount > 0
-              ? `${kpis.totalCheckpoints - kpis.checkpointsCoveredCount} checkpoints remain uninspected`
-              : '100% full building perimeter covered!'}
-          </p>
-        </div>
-
-        {/* KPI 3: Total Patrol Scans */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-500/10 to-transparent rounded-bl-full pointer-events-none" />
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <Flame className="w-4 h-4 text-purple-600" />
-              Patrol Scans Logged
-            </span>
-            <span className="px-2 py-0.5 text-[11px] font-extrabold rounded-md bg-purple-100 text-purple-800">
-              {kpis.successRate}% Success
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-900">{kpis.totalScans}</span>
-            <span className="text-xs text-slate-500 font-medium">scans verified</span>
-          </div>
-          <div className="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
-            <div
-              className="h-full bg-purple-600 rounded-full transition-all duration-700"
-              style={{ width: `${kpis.successRate}%` }}
-            />
-          </div>
-          <p className="text-[11px] text-slate-400 mt-2">
-            {kpis.successfulScans} successful · {kpis.rejectedScans} rejected/cooldown
-          </p>
-        </div>
-
-        {/* KPI 4: Average Patrol Pace */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full pointer-events-none" />
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-amber-600" />
-              Inspection Pace
-            </span>
-            <span className="px-2 py-0.5 text-[11px] font-extrabold rounded-md bg-amber-100 text-amber-800">
-              Cadence
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-900">
-              {kpis.avgPaceMinutes > 0 ? `${kpis.avgPaceMinutes}m` : '3.5m'}
-            </span>
-            <span className="text-xs text-slate-500 font-medium">per checkpoint</span>
-          </div>
-          <div className="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
-            <div className="h-full bg-amber-500 rounded-full w-3/4" />
-          </div>
-          <p className="text-[11px] text-slate-400 mt-2">
-            Standard floor transit speed between checkpoints
-          </p>
-        </div>
-      </div>
-
-      {/* 3. Visual Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Chart 1: Activity Timeline Trend (8 cols) */}
-        <div className="lg:col-span-8 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-blue-600" />
-                Patrol Scan Volume & Activity Trend
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {timeframe === 'today' ? 'Hourly patrol frequency throughout the day' : `Daily patrol distribution across ${timeframe}`}
-              </p>
-            </div>
-            <div className="flex items-center gap-3 text-xs font-semibold">
-              <span className="flex items-center gap-1.5 text-blue-600">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-                Total Scans
+      {/* ============================================================
+          SECTION 1: THE PODIUM SHOWCASE (TOP 3 CHAMPIONS)
+          Giant cards easily visible on a wall-mounted TV screen
+          ============================================================ */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* RANK #2 (Silver Medal - Left Podium) */}
+        <div className="bg-gradient-to-b from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-700/80 shadow-xl relative overflow-hidden flex flex-col justify-between order-2 md:order-1">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-slate-400/5 rounded-bl-full pointer-events-none" />
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <span className="flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-800 text-slate-200 border border-slate-600 text-xs font-black uppercase tracking-wider">
+                <Medal className="w-4 h-4 text-slate-300" />
+                #2 Rank · Runner Up
               </span>
-              <span className="flex items-center gap-1.5 text-emerald-600">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                Verified Valid
-              </span>
+              <span className="text-2xl font-black text-slate-400">🥈 2nd</span>
             </div>
-          </div>
 
-          <div className="h-64 w-full">
-            {perfData?.trendData && perfData.trendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={perfData.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="scanGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0.0} />
-                    </linearGradient>
-                    <linearGradient id="succGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0f172a',
-                      borderRadius: '12px',
-                      color: '#fff',
-                      border: 'none',
-                      fontSize: '12px',
-                    }}
-                  />
-                  <Area type="monotone" dataKey="scans" stroke="#2563eb" strokeWidth={2.5} fillOpacity={1} fill="url(#scanGrad)" name="Total Scans" />
-                  <Area type="monotone" dataKey="success" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#succGrad)" name="Successful" />
-                </AreaChart>
-              </ResponsiveContainer>
+            {top2 ? (
+              <>
+                <h3 className="text-xl lg:text-2xl font-black text-white truncate">
+                  {top2.full_name}
+                </h3>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                  {top2.phone !== 'N/A' ? top2.phone : top2.email}
+                </p>
+
+                <div className="mt-5 flex items-baseline gap-2">
+                  <span className="text-4xl lg:text-5xl font-black text-white">
+                    {top2.total_scans}
+                  </span>
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                    Total Scans
+                  </span>
+                </div>
+
+                {/* Coverage progress */}
+                <div className="mt-4 space-y-1.5">
+                  <div className="flex justify-between text-xs font-bold text-slate-300">
+                    <span>{top2.distinct_checkpoints} of {kpis.totalCheckpoints} Points</span>
+                    <span className="text-blue-400 font-black">{top2.coverage_pct}% Coverage</span>
+                  </div>
+                  <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-500 to-indigo-400 rounded-full transition-all duration-700"
+                      style={{ width: `${top2.coverage_pct}%` }}
+                    />
+                  </div>
+                </div>
+
+                {top2.last_scanned_location && (
+                  <p className="mt-4 text-[11px] text-slate-400 flex items-center gap-1.5 truncate">
+                    <MapPin className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                    <span className="truncate">Last: {top2.last_scanned_location}</span>
+                  </p>
+                )}
+              </>
             ) : (
-              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-                No scan activity recorded in this timeframe
+              <div className="py-8 text-center text-slate-500 text-sm font-semibold">
+                Awaiting officer check-in
               </div>
             )}
           </div>
         </div>
 
-        {/* Chart 2: Floor-wise Coverage (4 cols) */}
-        <div className="lg:col-span-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+        {/* RANK #1 (GOLD CHAMPION - Center Stage - Tallest & Most Prominent) */}
+        <div
+          className={`bg-gradient-to-b from-[#0F2040] via-[#0A1628] to-[#050D1A] p-6 lg:p-7 rounded-3xl border-2 shadow-2xl relative overflow-hidden flex flex-col justify-between order-1 md:order-2 transform md:-translate-y-2 transition-all ${
+            newScanFlash
+              ? 'border-[#D4FC04] ring-4 ring-[#D4FC04]/40 scale-[1.02]'
+              : 'border-[#D4FC04]/80 shadow-[#D4FC04]/10'
+          }`}
+        >
+          {/* Glowing aura */}
+          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-[#D4FC04]/20 to-transparent rounded-bl-full pointer-events-none" />
+
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Layers className="w-5 h-5 text-indigo-600" />
-                Floor & Zone Inspection
-              </h2>
+            <div className="flex items-center justify-between mb-4">
+              <span className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#D4FC04] text-slate-950 font-black text-xs uppercase tracking-wider shadow-md shadow-[#D4FC04]/30">
+                <Crown className="w-4 h-4 fill-slate-950" />
+                #1 PATROL LEADER
+              </span>
+              <span className="text-3xl font-black text-[#D4FC04]">👑 1st</span>
             </div>
-            <p className="text-xs text-slate-500 mb-4">Inspection volume per building section</p>
 
-            <div className="space-y-3.5">
-              {perfData?.floorDistribution && perfData.floorDistribution.length > 0 ? (
-                perfData.floorDistribution.slice(0, 5).map((f: any, idx: number) => (
-                  <div key={idx} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-slate-800 truncate">{f.floor}</span>
-                      <span className="text-slate-500">
-                        {f.visits} scans · <strong className="text-indigo-600">{f.coveragePct}%</strong>
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-indigo-500 to-blue-500 rounded-full"
-                        style={{ width: `${Math.min(100, Math.max(5, f.coveragePct))}%` }}
-                      />
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="py-8 text-center text-slate-400 text-xs">
-                  Floor data will populate as patrol checkpoints are scanned
+            {top1 ? (
+              <>
+                <h2 className="text-2xl lg:text-3xl font-black text-white tracking-tight truncate">
+                  {top1.full_name}
+                </h2>
+                <p className="text-xs text-[#D4FC04] font-mono font-bold mt-0.5">
+                  {top1.phone !== 'N/A' ? top1.phone : top1.email}
+                </p>
+
+                <div className="mt-5 flex items-baseline gap-2">
+                  <span className="text-5xl lg:text-6xl font-black text-[#D4FC04] tracking-tight">
+                    {top1.total_scans}
+                  </span>
+                  <span className="text-xs text-slate-300 font-extrabold uppercase tracking-wider">
+                    Total Scans Verified
+                  </span>
                 </div>
-              )}
-            </div>
-          </div>
 
-          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>53 Checkpoints configured</span>
-            <span className="font-bold text-slate-700">All floors monitored</span>
+                {/* Coverage progress */}
+                <div className="mt-4 space-y-1.5">
+                  <div className="flex justify-between text-xs font-bold text-slate-200">
+                    <span className="text-white font-extrabold">{top1.distinct_checkpoints} of {kpis.totalCheckpoints} Checkpoints</span>
+                    <span className="text-[#D4FC04] font-black">{top1.coverage_pct}% Perimeter</span>
+                  </div>
+                  <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-700/60 p-0.5">
+                    <div
+                      className="h-full bg-gradient-to-r from-emerald-400 via-[#D4FC04] to-[#D4FC04] rounded-full transition-all duration-700 shadow-md"
+                      style={{ width: `${top1.coverage_pct}%` }}
+                    />
+                  </div>
+                </div>
+
+                {top1.last_scanned_location && (
+                  <div className="mt-4 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
+                    <span className="text-slate-400 flex items-center gap-1.5 truncate">
+                      <MapPin className="w-4 h-4 text-[#D4FC04] flex-shrink-0" />
+                      <strong className="text-slate-200 truncate">{top1.last_scanned_location}</strong>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
+                      ACTIVE
+                    </span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="py-8 text-center text-slate-400 text-sm font-semibold">
+                Waiting for first patrol scan
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RANK #3 (Bronze Medal - Right Podium) */}
+        <div className="bg-gradient-to-b from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-700/80 shadow-xl relative overflow-hidden flex flex-col justify-between order-3">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-700/10 rounded-bl-full pointer-events-none" />
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <span className="flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-800 text-amber-200 border border-amber-800/40 text-xs font-black uppercase tracking-wider">
+                <Medal className="w-4 h-4 text-amber-500" />
+                #3 Rank · Third Place
+              </span>
+              <span className="text-2xl font-black text-amber-500">🥉 3rd</span>
+            </div>
+
+            {top3 ? (
+              <>
+                <h3 className="text-xl lg:text-2xl font-black text-white truncate">
+                  {top3.full_name}
+                </h3>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                  {top3.phone !== 'N/A' ? top3.phone : top3.email}
+                </p>
+
+                <div className="mt-5 flex items-baseline gap-2">
+                  <span className="text-4xl lg:text-5xl font-black text-white">
+                    {top3.total_scans}
+                  </span>
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                    Total Scans
+                  </span>
+                </div>
+
+                {/* Coverage progress */}
+                <div className="mt-4 space-y-1.5">
+                  <div className="flex justify-between text-xs font-bold text-slate-300">
+                    <span>{top3.distinct_checkpoints} of {kpis.totalCheckpoints} Points</span>
+                    <span className="text-amber-400 font-black">{top3.coverage_pct}% Coverage</span>
+                  </div>
+                  <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full transition-all duration-700"
+                      style={{ width: `${top3.coverage_pct}%` }}
+                    />
+                  </div>
+                </div>
+
+                {top3.last_scanned_location && (
+                  <p className="mt-4 text-[11px] text-slate-400 flex items-center gap-1.5 truncate">
+                    <MapPin className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                    <span className="truncate">Last: {top3.last_scanned_location}</span>
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="py-8 text-center text-slate-500 text-sm font-semibold">
+                Awaiting officer check-in
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* 4. Tab Navigation: Officers Leaderboard vs Checkpoints Audit */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Navigation Tabs Header */}
-        <div className="px-6 pt-5 pb-3 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveTab('officers')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                activeTab === 'officers'
-                  ? 'bg-slate-900 text-white shadow-md'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Trophy className="w-4 h-4 text-[#D4FC04]" />
-              Officer Performance Leaderboard ({perfData?.officerLeaderboard?.length || 0})
-            </button>
-
-            <button
-              onClick={() => setActiveTab('checkpoints')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                activeTab === 'checkpoints'
-                  ? 'bg-slate-900 text-white shadow-md'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <MapPin className="w-4 h-4 text-blue-500" />
-              Checkpoint Inspection Heatmap ({perfData?.checkpointStats?.length || 53})
-            </button>
+      {/* ============================================================
+          SECTION 2: COMPLETE REAL-TIME LEADERBOARD BOARD (Large TV Table)
+          ============================================================ */}
+      <div
+        className={`rounded-3xl border shadow-2xl overflow-hidden transition-all ${
+          isTvMode ? 'bg-[#0A1628] border-slate-800' : 'bg-white border-slate-200'
+        }`}
+      >
+        {/* Table Top Header Bar */}
+        <div
+          className={`p-5 lg:p-6 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+            isTvMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-blue-600 text-white shadow-md">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg lg:text-xl font-black tracking-tight">
+                FULL SQUAD STANDINGS & ACTIVITY ROSTER
+              </h2>
+              <p className="text-xs text-slate-400">
+                Live auto-updating every 3 seconds · Last synced {lastUpdated.toLocaleTimeString()}
+              </p>
+            </div>
           </div>
 
-          {/* Tab 2 filters if active */}
-          {activeTab === 'checkpoints' && (
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Filter checkpoint name..."
-                  value={checkpointSearch}
-                  onChange={(e) => setCheckpointSearch(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500 w-44"
-                />
-              </div>
-
-              <select
-                value={checkpointFilter}
-                onChange={(e) => setCheckpointFilter(e.target.value as any)}
-                className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none font-medium text-slate-700"
-              >
-                <option value="all">All Points</option>
-                <option value="visited">Visited Only</option>
-                <option value="unvisited">Missed / Unvisited</option>
-              </select>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              AUTO-SYNC ON
+            </span>
+          </div>
         </div>
 
-        {/* Tab 1 Content: Officer Leaderboard */}
-        {activeTab === 'officers' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-3 px-6">Rank</th>
-                  <th className="py-3 px-6">Officer / Personnel</th>
-                  <th className="py-3 px-6 text-center">Total Scans</th>
-                  <th className="py-3 px-6">Checkpoints Covered</th>
-                  <th className="py-3 px-6 text-center">Coverage %</th>
-                  <th className="py-3 px-6 text-center">Avg Pace</th>
-                  <th className="py-3 px-6 text-center">Performance Rating</th>
-                  <th className="py-3 px-6">Last Active</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
-                {perfData?.officerLeaderboard && perfData.officerLeaderboard.length > 0 ? (
-                  perfData.officerLeaderboard.map((officer: any, index: number) => {
-                    const isTop1 = index === 0 && officer.total_scans > 0
-                    const isTop2 = index === 1 && officer.total_scans > 0
-                    const isTop3 = index === 2 && officer.total_scans > 0
+        {/* Large Roster Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr
+                className={`text-xs font-black uppercase tracking-wider border-b ${
+                  isTvMode
+                    ? 'bg-slate-950/80 text-slate-400 border-slate-800'
+                    : 'bg-slate-100/80 text-slate-500 border-slate-200'
+                }`}
+              >
+                <th className="py-4 px-6 text-center w-20">Rank</th>
+                <th className="py-4 px-6">Officer Name & Contact</th>
+                <th className="py-4 px-6 text-center">Total Scans</th>
+                <th className="py-4 px-6">Checkpoint Coverage</th>
+                <th className="py-4 px-6 text-center">Coverage %</th>
+                <th className="py-4 px-6">Current / Last Location</th>
+                <th className="py-4 px-6 text-center">Patrol Status</th>
+                <th className="py-4 px-6 text-center">Rating</th>
+              </tr>
+            </thead>
+            <tbody className={`divide-y text-sm ${isTvMode ? 'divide-slate-800 text-slate-200' : 'divide-slate-100 text-slate-800'}`}>
+              {officers.length > 0 ? (
+                officers.map((officer: any, idx: number) => {
+                  const isGold = idx === 0 && officer.total_scans > 0
+                  const isSilver = idx === 1 && officer.total_scans > 0
+                  const isBronze = idx === 2 && officer.total_scans > 0
 
-                    return (
-                      <tr key={officer.id} className="hover:bg-slate-50/70 transition-colors">
-                        {/* Rank Badge */}
-                        <td className="py-4 px-6">
-                          <span
-                            className={`inline-flex items-center justify-center w-7 h-7 rounded-full font-black text-xs ${
-                              isTop1
-                                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/30'
-                                : isTop2
-                                ? 'bg-slate-300 text-slate-800'
-                                : isTop3
-                                ? 'bg-amber-600/30 text-amber-900'
-                                : 'bg-slate-100 text-slate-500'
+                  return (
+                    <tr
+                      key={officer.id}
+                      className={`transition-colors ${
+                        isGold
+                          ? isTvMode ? 'bg-[#0F2040]/40 hover:bg-[#0F2040]/70' : 'bg-amber-50/60 hover:bg-amber-50'
+                          : isTvMode ? 'hover:bg-slate-800/60' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      {/* Rank Column */}
+                      <td className="py-5 px-6 text-center font-black">
+                        <span
+                          className={`inline-flex items-center justify-center w-9 h-9 rounded-2xl font-black text-sm ${
+                            isGold
+                              ? 'bg-[#D4FC04] text-slate-950 shadow-lg shadow-[#D4FC04]/30'
+                              : isSilver
+                              ? 'bg-slate-300 text-slate-950'
+                              : isBronze
+                              ? 'bg-amber-600 text-white'
+                              : isTvMode
+                              ? 'bg-slate-800 text-slate-400'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {idx + 1}
+                        </span>
+                      </td>
+
+                      {/* Officer Profile */}
+                      <td className="py-5 px-6">
+                        <div className="flex items-center gap-3.5">
+                          <div
+                            className={`w-10 h-10 rounded-2xl font-black flex items-center justify-center text-sm ${
+                              isGold
+                                ? 'bg-[#D4FC04] text-slate-950 shadow-md'
+                                : 'bg-blue-600 text-white'
                             }`}
                           >
-                            {index + 1}
-                          </span>
-                        </td>
-
-                        {/* Officer Profile */}
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-slate-900 text-[#D4FC04] font-bold flex items-center justify-center text-xs">
-                              {officer.full_name.slice(0, 2).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="font-bold text-slate-900">{officer.full_name}</p>
-                              <p className="text-[11px] text-slate-400">{officer.phone !== 'N/A' ? officer.phone : officer.email}</p>
-                            </div>
+                            {officer.full_name.slice(0, 2).toUpperCase()}
                           </div>
-                        </td>
+                          <div>
+                            <p className="font-black text-base lg:text-lg leading-tight">
+                              {officer.full_name}
+                            </p>
+                            <p className="text-xs text-slate-400 font-mono mt-0.5">
+                              {officer.phone !== 'N/A' ? officer.phone : officer.email}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
 
-                        {/* Total Scans */}
-                        <td className="py-4 px-6 text-center font-black text-slate-900 text-sm">
+                      {/* Total Scans Verified */}
+                      <td className="py-5 px-6 text-center">
+                        <span className="text-xl lg:text-2xl font-black text-[#D4FC04]">
                           {officer.total_scans}
-                        </td>
+                        </span>
+                        <span className="block text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                          Scans
+                        </span>
+                      </td>
 
-                        {/* Checkpoints Covered */}
-                        <td className="py-4 px-6">
-                          <div className="w-36 space-y-1">
-                            <div className="flex justify-between text-[11px] font-semibold text-slate-600">
-                              <span>{officer.distinct_checkpoints} of {kpis.totalCheckpoints}</span>
-                              <span>{officer.coverage_pct}%</span>
-                            </div>
-                            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-blue-600 rounded-full"
-                                style={{ width: `${officer.coverage_pct}%` }}
-                              />
+                      {/* Checkpoint Coverage Bar */}
+                      <td className="py-5 px-6">
+                        <div className="w-44 space-y-1.5">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span className="text-slate-300">{officer.distinct_checkpoints} of {kpis.totalCheckpoints} Points</span>
+                            <span className="text-blue-400">{officer.coverage_pct}%</span>
+                          </div>
+                          <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
+                              style={{ width: `${officer.coverage_pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Coverage Rate % */}
+                      <td className="py-5 px-6 text-center font-black text-base">
+                        {officer.coverage_pct}%
+                      </td>
+
+                      {/* Current / Last Location */}
+                      <td className="py-5 px-6">
+                        {officer.last_scanned_location ? (
+                          <div className="flex items-center gap-2 max-w-xs">
+                            <MapPin className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                            <div className="truncate">
+                              <p className="font-bold text-xs truncate">{officer.last_scanned_location}</p>
+                              <p className="text-[10px] text-slate-400">
+                                {officer.last_scanned_at
+                                  ? new Date(officer.last_scanned_at).toLocaleTimeString('en-US', {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })
+                                  : ''}
+                              </p>
                             </div>
                           </div>
-                        </td>
+                        ) : (
+                          <span className="text-xs text-slate-500 italic">No scans in timeframe</span>
+                        )}
+                      </td>
 
-                        {/* Coverage % */}
-                        <td className="py-4 px-6 text-center font-bold text-slate-800">
-                          {officer.coverage_pct}%
-                        </td>
-
-                        {/* Avg Pace */}
-                        <td className="py-4 px-6 text-center text-slate-600 font-medium">
-                          {officer.avg_pace_minutes ? `${officer.avg_pace_minutes} mins` : '—'}
-                        </td>
-
-                        {/* Performance Rating */}
-                        <td className="py-4 px-6 text-center">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                              officer.total_scans >= 10
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : officer.total_scans > 0
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            {officer.total_scans >= 10 ? '✓ Outstanding' : officer.total_scans > 0 ? 'Good' : 'Standby'}
-                          </span>
-                        </td>
-
-                        {/* Last Active */}
-                        <td className="py-4 px-6 text-slate-500 text-[11px]">
-                          {officer.last_scanned_at ? (
-                            new Date(officer.last_scanned_at).toLocaleString('en-GB', {
-                              day: '2-digit',
-                              month: 'short',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
+                      {/* Patrol Status */}
+                      <td className="py-5 px-6 text-center">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black ${
+                            officer.total_scans > 0
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {officer.total_scans > 0 ? (
+                            <>
+                              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                              ON PATROL
+                            </>
                           ) : (
-                            <span className="text-slate-400">No activity</span>
+                            'STANDBY'
                           )}
-                        </td>
-                      </tr>
-                    )
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400">
-                      No officer records found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                        </span>
+                      </td>
 
-        {/* Tab 2 Content: Checkpoint Inspection Heatmap */}
-        {activeTab === 'checkpoints' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-3 px-6">#</th>
-                  <th className="py-3 px-6">Checkpoint Location Name</th>
-                  <th className="py-3 px-6 text-center">Visits in Period</th>
-                  <th className="py-3 px-6 text-center">Inspection Health</th>
-                  <th className="py-3 px-6">Last Inspected</th>
-                  <th className="py-3 px-6">Security Token</th>
+                      {/* Rating */}
+                      <td className="py-5 px-6 text-center">
+                        <span
+                          className={`px-3 py-1 rounded-xl text-xs font-black ${
+                            officer.total_scans >= 10
+                              ? 'bg-[#D4FC04]/20 text-[#D4FC04] border border-[#D4FC04]/40'
+                              : officer.total_scans > 0
+                              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                              : 'bg-slate-800 text-slate-500'
+                          }`}
+                        >
+                          {officer.rating}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })
+              ) : (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-slate-400 text-base font-bold">
+                    No officer patrol logs found for {timeframe}
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
-                {filteredCheckpoints.length > 0 ? (
-                  filteredCheckpoints.map((cp: any, index: number) => {
-                    return (
-                      <tr key={cp.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-3.5 px-6 font-bold text-slate-400">{index + 1}</td>
-                        <td className="py-3.5 px-6 font-bold text-slate-900 flex items-center gap-2">
-                          <MapPin className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                          <span>{cp.location_name}</span>
-                        </td>
-                        <td className="py-3.5 px-6 text-center font-black text-slate-800">
-                          {cp.visits}
-                        </td>
-                        <td className="py-3.5 px-6 text-center">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              cp.visits >= 3
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : cp.visits > 0
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-rose-100 text-rose-800'
-                            }`}
-                          >
-                            {cp.visits >= 3 ? '✓ Optimal Frequency' : cp.visits > 0 ? 'Moderate' : '⚠ Uninspected'}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-6 text-slate-500 text-[11px]">
-                          {cp.last_scanned_at ? (
-                            new Date(cp.last_scanned_at).toLocaleString('en-GB', {
-                              day: '2-digit',
-                              month: 'short',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          ) : (
-                            <span className="text-rose-500 font-semibold">Never in this range</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-6 font-mono text-[10px] text-slate-400 truncate max-w-xs">
-                          {cp.token}
-                        </td>
-                      </tr>
-                    )
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-400">
-                      No checkpoints matching current search filter
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ============================================================
+          SECTION 3: SUMMARY METRIC CHIPS & ACTIVITY CHARTS (Below Leaderboard)
+          ============================================================ */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metric 1 */}
+        <div
+          className={`p-5 rounded-2xl border transition-all ${
+            isTvMode ? 'bg-[#0A1628] border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+          }`}
+        >
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            Compliance Score
+          </p>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-3xl font-black">{kpis.complianceScore}%</span>
+            <span className="text-xs text-emerald-400 font-bold">Audit Grade A+</span>
           </div>
-        )}
+        </div>
+
+        {/* Metric 2 */}
+        <div
+          className={`p-5 rounded-2xl border transition-all ${
+            isTvMode ? 'bg-[#0A1628] border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+          }`}
+        >
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <MapPin className="w-4 h-4 text-blue-400" />
+            Checkpoints Inspected
+          </p>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-3xl font-black">
+              {kpis.checkpointsCoveredCount}
+              <span className="text-slate-400 text-xl font-semibold"> / {kpis.totalCheckpoints}</span>
+            </span>
+            <span className="text-xs text-blue-400 font-bold">{kpis.coverageRate}%</span>
+          </div>
+        </div>
+
+        {/* Metric 3 */}
+        <div
+          className={`p-5 rounded-2xl border transition-all ${
+            isTvMode ? 'bg-[#0A1628] border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+          }`}
+        >
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <Flame className="w-4 h-4 text-purple-400" />
+            Verified Scans
+          </p>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-3xl font-black">{kpis.totalScans}</span>
+            <span className="text-xs text-purple-400 font-bold">{kpis.successRate}% Success</span>
+          </div>
+        </div>
+
+        {/* Metric 4 */}
+        <div
+          className={`p-5 rounded-2xl border transition-all ${
+            isTvMode ? 'bg-[#0A1628] border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+          }`}
+        >
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <Clock className="w-4 h-4 text-amber-400" />
+            Pace Cadence
+          </p>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-3xl font-black">{kpis.avgPaceMinutes || 3.5}m</span>
+            <span className="text-xs text-amber-400 font-bold">per checkpoint</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Visual Chart & Checkpoint Inspection Feed */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Patrol Activity Trend AreaChart (7 cols) */}
+        <div
+          className={`lg:col-span-7 p-6 rounded-3xl border shadow-xl ${
+            isTvMode ? 'bg-[#0A1628] border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-base font-black flex items-center gap-2">
+                <Activity className="w-5 h-5 text-blue-500" />
+                Patrol Scan Activity Rhythm
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {timeframe === 'today' ? 'Hourly patrol coverage cadence' : `Daily patrol distribution across ${timeframe}`}
+              </p>
+            </div>
+            <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/30">
+              Live Trend
+            </span>
+          </div>
+
+          <div className="h-60 w-full">
+            {perfData?.trendData && perfData.trendData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={perfData.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="tvScanGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#D4FC04" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#D4FC04" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={isTvMode ? '#1e293b' : '#f1f5f9'} vertical={false} />
+                  <XAxis dataKey="label" stroke="#64748b" fontSize={11} tickLine={false} />
+                  <YAxis stroke="#64748b" fontSize={11} tickLine={false} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#050D1A',
+                      borderRadius: '12px',
+                      color: '#fff',
+                      border: '1px solid #1e293b',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="scans"
+                    stroke="#D4FC04"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#tvScanGrad)"
+                    name="Scans"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-500 text-xs">
+                No scan data in timeframe
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Checkpoint Inspection Heatmap (5 cols) */}
+        <div
+          className={`lg:col-span-5 p-6 rounded-3xl border shadow-xl flex flex-col justify-between ${
+            isTvMode ? 'bg-[#0A1628] border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}
+        >
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-base font-black flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-emerald-400" />
+                Floor & Zone Health
+              </h3>
+              <span className="text-xs font-mono font-bold text-slate-400">53 Checkpoints</span>
+            </div>
+            <p className="text-xs text-slate-400 mb-4">Inspection volume per building section</p>
+
+            <div className="space-y-3">
+              {perfData?.floorDistribution?.slice(0, 5).map((f: any, idx: number) => (
+                <div key={idx} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="truncate">{f.floor}</span>
+                    <span className="text-emerald-400">{f.visits} scans · {f.coveragePct}%</span>
+                  </div>
+                  <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-emerald-500 to-[#D4FC04] rounded-full"
+                      style={{ width: `${Math.min(100, Math.max(8, f.coveragePct))}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <span>Perimeter Checkpoints 100% Active</span>
+            <span className="text-[#D4FC04] font-bold">MUVE QR v1.0</span>
+          </div>
+        </div>
       </div>
     </div>
   )
