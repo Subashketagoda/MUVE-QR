@@ -9,10 +9,11 @@ import {
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  const all = await getAllPushSubscriptions()
   return NextResponse.json({
     success: true,
     publicKey: VAPID_PUBLIC_KEY,
-    activeSubscribersCount: getAllPushSubscriptions().length,
+    activeSubscribersCount: all.length,
   })
 }
 
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    addPushSubscription({
+    const updated = await addPushSubscription({
       endpoint: subscription.endpoint,
       keys: {
         p256dh: subscription.keys.p256dh,
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Push subscription registered successfully for lock screen alerts.',
-      activeCount: getAllPushSubscriptions().length,
+      activeCount: updated.length,
     })
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 })
@@ -68,7 +69,7 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const endpoint = searchParams.get('endpoint')
     if (endpoint) {
-      removePushSubscription(endpoint)
+      await removePushSubscription(endpoint)
     }
     return NextResponse.json({ success: true, message: 'Unsubscribed' })
   } catch (err: any) {

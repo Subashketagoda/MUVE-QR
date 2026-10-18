@@ -32,7 +32,7 @@ export interface PushNotificationPayload {
  * This triggers the device lock-screen display, sound, and vibration via the Service Worker.
  */
 export async function sendPushToAllStaff(payload: PushNotificationPayload) {
-  const subscriptions = getAllPushSubscriptions()
+  const subscriptions = await getAllPushSubscriptions()
   if (!subscriptions || subscriptions.length === 0) {
     console.log('[WebPush] No staff push subscriptions registered yet.')
     return { success: true, count: 0, sent: 0 }
@@ -66,7 +66,7 @@ export async function sendPushToAllStaff(payload: PushNotificationPayload) {
       } catch (err: any) {
         // If subscription is expired or unsubscribed (HTTP 410 or 404), clean it up
         if (err.statusCode === 410 || err.statusCode === 404) {
-          removePushSubscription(sub.endpoint)
+          await removePushSubscription(sub.endpoint)
         }
         throw err
       }

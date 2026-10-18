@@ -158,13 +158,14 @@ export function LockScreenNotificationManager() {
       setPermission(Notification.permission)
     }
 
-    // Register Service Worker
+    // Register Service Worker and await ready state
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/sw.js')
+        .then(() => navigator.serviceWorker.ready)
         .then((reg) => {
           setSwReg(reg)
-          if (Notification.permission === 'granted') {
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
             subscribeToPush(reg)
           }
         })
@@ -186,8 +187,9 @@ export function LockScreenNotificationManager() {
       setPermission(result)
 
       if (result === 'granted') {
-        if (swReg) {
-          await subscribeToPush(swReg)
+        const reg = swReg || ('serviceWorker' in navigator ? await navigator.serviceWorker.ready : null)
+        if (reg) {
+          await subscribeToPush(reg)
         }
         playAlertSound()
         vibratePhone()

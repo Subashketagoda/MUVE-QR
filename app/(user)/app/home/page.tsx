@@ -171,7 +171,44 @@ export default function UserHomePage() {
         }
       }
     }
-    toast.info('Test Alert dispatched! Lock your phone screen now to test.', { duration: 4500 })
+
+    // Ensure Push Subscription is actively registered to Supabase backend
+    if ('serviceWorker' in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.ready
+        let sub = await reg.pushManager.getSubscription()
+        if (!sub) {
+          const res = await fetch('/api/push/subscribe')
+          const data = await res.json()
+          if (data.publicKey) {
+            const padding = '='.repeat((4 - (data.publicKey.length % 4)) % 4)
+            const base64 = (data.publicKey + padding).replace(/-/g, '+').replace(/_/g, '/')
+            const rawData = window.atob(base64)
+            const outputArray = new Uint8Array(rawData.length)
+            for (let i = 0; i < rawData.length; ++i) {
+              outputArray[i] = rawData.charCodeAt(i)
+            }
+            sub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: outputArray,
+            })
+          }
+        }
+        if (sub) {
+          await fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subscription: sub, userId: user?.id || 'staff' }),
+          })
+        }
+      } catch (e) {
+        console.warn('Subscription registration error:', e)
+      }
+    }
+
+    toast.info('Lock Alert dispatched! Lock your phone screen NOW to test (3s timer).', { duration: 5000 })
+
+    // 1. Direct Service Worker notification
     setTimeout(() => {
       if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({
@@ -180,16 +217,18 @@ export default function UserHomePage() {
           body: 'Visitor reported: Water leakage near sink (HIGH PRIORITY) — Lock Screen Alert Test',
           data: { url: '/app/tasks' },
         })
-      } else if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('🚨 TEST REPORT: 01st Floor - Ladies Washroom', {
-          body: 'Visitor reported: Water leakage near sink (HIGH PRIORITY) — Lock Screen Alert Test',
-          icon: '/icons/icon-192.png',
-        })
       }
       try {
         if ('vibrate' in navigator) navigator.vibrate([400, 200, 400, 200, 600])
       } catch (e) {}
-    }, 1500)
+    }, 2500)
+
+    // 2. Real Server Web Push to wake up locked phone from sleep/background
+    setTimeout(async () => {
+      try {
+        await fetch('/api/push/test', { method: 'POST' })
+      } catch (e) {}
+    }, 3000)
   }
 
   return (

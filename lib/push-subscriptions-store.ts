@@ -1,6 +1,3 @@
-import fs from 'fs'
-import path from 'path'
-
 export interface PushSubscriptionRecord {
   endpoint: string
   keys: {
@@ -12,65 +9,81 @@ export interface PushSubscriptionRecord {
   createdAt: string
 }
 
-// Global in-memory cache
-declare global {
-  var __muve_push_subscriptions: PushSubscriptionRecord[] | undefined
-}
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qokfbbcwykbdruvqwnhr.supabase.co'
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_g3D5qPwtftS5rdjYSfeDmg_MoxMSr-0'
 
-if (!global.__muve_push_subscriptions) {
-  global.__muve_push_subscriptions = []
-}
-
-const SUBSCRIPTIONS_FILE = path.join(process.cwd(), 'lib', 'push-subscriptions.json')
-
-// Helper to load persisted subscriptions on startup
-function loadSubscriptions(): PushSubscriptionRecord[] {
-  if (global.__muve_push_subscriptions && global.__muve_push_subscriptions.length > 0) {
-    return global.__muve_push_subscriptions
-  }
+// Load all subscriptions from Supabase settings table (key: 'push_subscriptions')
+export async function getAllPushSubscriptions(): Promise<PushSubscriptionRecord[]> {
   try {
-    if (fs.existsSync(SUBSCRIPTIONS_FILE)) {
-      const content = fs.readFileSync(SUBSCRIPTIONS_FILE, 'utf-8')
-      const parsed = JSON.parse(content)
-      if (Array.isArray(parsed)) {
-        global.__muve_push_subscriptions = parsed
-        return parsed
-      }
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.push_subscriptions`, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+      cache: 'no-store',
+    })
+    const data = await res.json()
+    if (Array.isArray(data) && data[0]?.value) {
+      const parsed = JSON.parse(data[0].value)
+      if (Array.isArray(parsed)) return parsed
     }
   } catch (e) {
-    console.warn('Failed to read push subscriptions file:', e)
+    console.warn('[PushStore] Error reading subscriptions from Supabase:', e)
   }
-  return global.__muve_push_subscriptions || []
+  return []
 }
 
-function saveSubscriptions(subs: PushSubscriptionRecord[]) {
-  global.__muve_push_subscriptions = subs
-  try {
-    fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(subs, null, 2), 'utf-8')
-  } catch (e) {
-    // Read-only filesystem on some serverless platforms, in-memory remains active
-  }
-}
-
-export function addPushSubscription(sub: PushSubscriptionRecord) {
-  const current = loadSubscriptions()
+// Save a new or updated subscription to Supabase settings table
+export async function addPushSubscription(sub: PushSubscriptionRecord): Promise<PushSubscriptionRecord[]> {
+  const current = await getAllPushSubscriptions()
   const existsIdx = current.findIndex((s) => s.endpoint === sub.endpoint)
   if (existsIdx >= 0) {
     current[existsIdx] = sub
   } else {
     current.push(sub)
   }
-  saveSubscriptions(current)
+
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.push_subscriptions`, {
+      method: 'PATCH',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        value: JSON.stringify(current),
+        updated_at: new Date().toISOString(),
+      }),
+    })
+  } catch (e) {
+    console.warn('[PushStore] Error saving subscription to Supabase:', e)
+  }
+
   return current
 }
 
-export function removePushSubscription(endpoint: string) {
-  const current = loadSubscriptions()
+// Remove an expired or unsubscribed endpoint from Supabase settings table
+export async function removePushSubscription(endpoint: string): Promise<PushSubscriptionRecord[]> {
+  const current = await getAllPushSubscriptions()
   const filtered = current.filter((s) => s.endpoint !== endpoint)
-  saveSubscriptions(filtered)
-  return filtered
-}
 
-export function getAllPushSubscriptions(): PushSubscriptionRecord[] {
-  return loadSubscriptions()
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.push_subscriptions`, {
+      method: 'PATCH',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        value: JSON.stringify(filtered),
+        updated_at: new Date().toISOString(),
+      }),
+    })
+  } catch (e) {
+    console.warn('[PushStore] Error removing subscription from Supabase:', e)
+  }
+
+  return filtered
 }
