@@ -15,8 +15,11 @@ export const metadata: Metadata = {
     title: "MUVE QR",
   },
   icons: {
-    icon: "/icons/icon.svg",
-    apple: "/icons/icon.svg",
+    icon: [
+      { url: '/muve-logo.jpg', type: 'image/jpeg' },
+    ],
+    apple: '/muve-logo.jpg',
+    shortcut: '/muve-logo.jpg',
   },
 };
 
@@ -38,7 +41,13 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/muve-logo.jpg" type="image/jpeg" />
+        <link rel="apple-touch-icon" href="/muve-logo.jpg" />
+        <link rel="shortcut icon" href="/muve-logo.jpg" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="MUVE QR" />
       </head>
       <body className={inter.className}>
         {children}
