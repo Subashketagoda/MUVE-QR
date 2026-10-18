@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { INITIAL_NOTIFICATIONS } from '@/lib/demo-store'
+import { sendPushToAllStaff } from '@/lib/web-push-sender'
+import { addTodoToStore } from '@/lib/todos-store'
 
 export async function GET(req: NextRequest) {
   try {
@@ -72,6 +74,8 @@ export async function POST(req: NextRequest) {
       !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
       !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
 
+    let createdNotification: any = null
+
     if (isSupabaseConfigured) {
       const isUUID = (val: string) =>
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val || '')
@@ -88,22 +92,65 @@ export async function POST(req: NextRequest) {
         .select()
         .single()
 
-      if (error) throw error
-      return NextResponse.json({ success: true, notification: data })
+      if (!error && data) {
+        createdNotification = data
+      }
     }
 
-    const newNotif = {
-      id: `notif_${Date.now()}`,
-      type: type as any,
-      title,
-      message,
-      scan_id: scan_id || null,
-      is_read: false,
-      created_at: new Date().toISOString(),
+    if (!createdNotification) {
+      createdNotification = {
+        id: `notif_${Date.now()}`,
+        type: type as any,
+        title,
+        message,
+        scan_id: scan_id || null,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      }
+      INITIAL_NOTIFICATIONS.unshift(createdNotification)
     }
-    INITIAL_NOTIFICATIONS.unshift(newNotif)
 
-    return NextResponse.json({ success: true, notification: newNotif })
+    // If this is an actionable notification (not routine background scan), send to mobile phones & todolist
+    if (type !== 'scan') {
+      // 1. Dispatch Web Push to all staff phones (lock screen + audio)
+      try {
+        await sendPushToAllStaff({
+          title,
+          body: message,
+          url: '/app/tasks',
+          tag: `muve-notif-${createdNotification.id}`,
+          category: type.toUpperCase(),
+          priority: type === 'alert' ? 'high' : 'medium',
+        })
+      } catch (pushErr) {
+        console.warn('[Push] Error broadcasting notification to phones:', pushErr)
+      }
+
+      // 2. Add as a todo list item for all staff checklist
+      try {
+        await addTodoToStore({
+          id: createdNotification.id,
+          user_id: 'all',
+          user_name: 'System Admin',
+          user_phone: 'MUVE Notification',
+          title,
+          description: message,
+          priority: type === 'alert' ? 'high' : 'medium',
+          status: 'pending',
+          assigned_by: 'System Admin Dispatch',
+          admin_reviewed: false,
+          admin_notes: null,
+          reviewed_by: null,
+          reviewed_at: null,
+          created_at: createdNotification.created_at || new Date().toISOString(),
+          updated_at: createdNotification.created_at || new Date().toISOString(),
+        })
+      } catch (storeErr) {
+        console.warn('[TodosStore] Error saving notification to todos:', storeErr)
+      }
+    }
+
+    return NextResponse.json({ success: true, notification: createdNotification })
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 })
   }

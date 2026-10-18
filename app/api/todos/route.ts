@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { TodoRow } from '@/types/database'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { sendPushToAllStaff } from '@/lib/web-push-sender'
 import {
   getAllTodosFromStore,
   addTodoToStore,
@@ -87,6 +89,35 @@ export async function POST(req: NextRequest) {
     }
 
     const saved = await addTodoToStore(newTodo)
+
+    // 1. Dispatch push notification to all mobile phones
+    try {
+      await sendPushToAllStaff({
+        title: `📋 New Task: ${title.trim()}`,
+        body: description ? description.trim() : `New checklist task assigned by ${assigned_by || 'Admin'}`,
+        url: '/app/tasks',
+        tag: `muve-task-${saved.id}`,
+        priority: priority || 'medium',
+      })
+    } catch (pushErr) {
+      console.warn('[Push] Error sending task push to staff:', pushErr)
+    }
+
+    // 2. Insert into Supabase notifications table
+    try {
+      const isSupabaseConfigured =
+        !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+        !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+      if (isSupabaseConfigured) {
+        await (supabaseAdmin as any).from('notifications').insert({
+          type: 'alert',
+          title: `📋 Task: ${title.trim()}`,
+          message: description ? description.trim() : `Assigned by ${assigned_by || 'Admin'}`,
+          is_read: false,
+        })
+      }
+    } catch (e) {}
+
     return NextResponse.json({ success: true, todo: saved })
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 })

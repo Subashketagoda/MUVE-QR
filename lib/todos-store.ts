@@ -36,10 +36,10 @@ export async function getAllTodosFromStore(): Promise<TodoRow[]> {
     storedTodos = [...INITIAL_TODOS]
   }
 
-  // Step B: Fetch alert notifications from Supabase notifications table
+  // Step B: Fetch all notifications (alerts, reports, admin dispatches) from Supabase notifications table
   try {
     const resNotif = await fetch(
-      `${SUPABASE_URL}/rest/v1/notifications?type=eq.alert&select=*&order=created_at.desc&limit=50`,
+      `${SUPABASE_URL}/rest/v1/notifications?type=neq.scan&select=*&order=created_at.desc&limit=60`,
       {
         headers: HEADERS,
         cache: 'no-store',
@@ -59,17 +59,18 @@ export async function getAllTodosFromStore(): Promise<TodoRow[]> {
             storedTodos[existingIdx].id = a.id
           }
         } else {
-          // New report from public visitor not yet in stored todos
+          // Add notification to todos list
+          const isReport = a.title?.includes('Report') || a.title?.includes('🚨')
           storedTodos.unshift({
             id: a.id,
             user_id: 'all',
-            user_name: 'Public Visitor',
-            user_phone: 'Public Checkpoint Scan',
+            user_name: isReport ? 'Public Visitor' : 'Admin Dispatch',
+            user_phone: isReport ? 'Public Checkpoint Scan' : 'System Notification',
             title: a.title,
             description: a.message,
-            priority: 'high',
+            priority: a.title?.includes('URGENT') || a.message?.includes('URGENT') ? 'urgent' : 'high',
             status: a.is_read ? 'completed' : 'pending',
-            assigned_by: 'Public Checkpoint Scan',
+            assigned_by: isReport ? 'Public Checkpoint Scan' : 'System Admin',
             admin_reviewed: !!a.is_read,
             admin_notes: null,
             reviewed_by: null,

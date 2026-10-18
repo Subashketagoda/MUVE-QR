@@ -255,7 +255,7 @@ export function LockScreenNotificationManager() {
           { event: 'INSERT', schema: 'public', table: 'notifications' },
           (payload: any) => {
             const notif = payload.new
-            if (notif && (notif.type === 'alert' || notif.title?.includes('Report') || notif.title?.includes('🚨'))) {
+            if (notif && notif.type !== 'scan') {
               handleNewAlert(notif)
             }
           }
@@ -263,16 +263,16 @@ export function LockScreenNotificationManager() {
         .subscribe()
     } catch (e) {}
 
-    // Polling fallback every 3.5s to ensure zero missed reports
+    // Polling fallback every 3.5s to ensure zero missed notifications or tasks
     const pollInterval = setInterval(async () => {
       try {
         const res = await fetch(`/api/notifications?t=${Date.now()}`, { cache: 'no-store' })
         const json = await res.json()
         if (json.success && Array.isArray(json.notifications)) {
-          // Check most recent 5 notifications
+          // Check most recent 10 notifications (excluding routine patrol scans)
           const recentAlerts = json.notifications
-            .slice(0, 5)
-            .filter((n: any) => n.type === 'alert' || n.title?.includes('Report') || n.title?.includes('🚨'))
+            .slice(0, 10)
+            .filter((n: any) => n.type !== 'scan')
 
           for (const alert of recentAlerts) {
             const alertId = alert.id || alert.title
@@ -319,10 +319,17 @@ export function LockScreenNotificationManager() {
   // Helper to parse title and message details
   const parsedReport = incomingAlert
     ? (() => {
-        let category = 'MAINTENANCE'
-        let location = 'Verified Checkpoint'
+        const isTask =
+          incomingAlert.type === 'task' ||
+          incomingAlert.title?.includes('Task') ||
+          incomingAlert.title?.includes('📋')
+        const isReport =
+          incomingAlert.title?.includes('Report') || incomingAlert.title?.includes('🚨')
+
+        let category = isTask ? 'TASK DISPATCH' : isReport ? 'INCIDENT REPORT' : 'NOTIFICATION'
+        let location = incomingAlert.title || 'MUVE Security System'
         let details = incomingAlert.message || ''
-        let reporter = 'Public Visitor'
+        let reporter = isReport ? 'Public Visitor' : 'System Admin'
         let priority = 'HIGH'
 
         if (incomingAlert.title) {
@@ -331,7 +338,9 @@ export function LockScreenNotificationManager() {
             category = match[1].toUpperCase()
             location = match[2]
           } else {
-            location = incomingAlert.title.replace(/^🚨\s*(?:Public Report:\s*)?/, '')
+            location = incomingAlert.title
+              .replace(/^🚨\s*(?:Public Report:\s*)?/, '')
+              .replace(/^📋\s*(?:Task:\s*)?/, '')
           }
         }
 
@@ -345,6 +354,8 @@ export function LockScreenNotificationManager() {
         }
 
         return {
+          isTask,
+          isReport,
           category,
           location,
           details,
@@ -373,7 +384,7 @@ export function LockScreenNotificationManager() {
               <div className="flex items-center justify-between mb-4">
                 <span className="flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[11px] font-black uppercase tracking-wider">
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-                  INCIDENT ALERT DISPATCHED
+                  {parsedReport.isTask ? 'NEW TASK DISPATCHED' : parsedReport.isReport ? 'INCIDENT ALERT DISPATCHED' : 'SYSTEM NOTIFICATION'}
                 </span>
 
                 <button
@@ -409,14 +420,14 @@ export function LockScreenNotificationManager() {
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400 font-medium flex items-center gap-1.5">
                     <User className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Reported by:</span>
+                    <span>{parsedReport.isTask ? 'Assigned by:' : 'Source:'}</span>
                   </span>
                   <span className="font-bold text-white text-xs">{parsedReport.reporter}</span>
                 </div>
 
                 <div className="pt-2 border-t border-slate-800">
                   <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">
-                    Issue Details:
+                    {parsedReport.isTask ? 'Task Instructions / Details:' : 'Issue Details:'}
                   </p>
                   <p className="text-xs text-slate-200 leading-relaxed font-medium bg-black/40 p-2.5 rounded-xl border border-white/5">
                     {parsedReport.details}
