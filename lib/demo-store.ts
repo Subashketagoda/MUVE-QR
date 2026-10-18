@@ -52,7 +52,9 @@ export let INITIAL_USERS: UserRow[] = [
   },
 ]
 
-export let INITIAL_QR_CODES: QRCodeRow[] = []
+import backupQRCodes from './initial-qr-codes.json'
+
+export let INITIAL_QR_CODES: QRCodeRow[] = (backupQRCodes || []) as QRCodeRow[]
 
 export let INITIAL_SCANS: ScanLogRow[] = []
 

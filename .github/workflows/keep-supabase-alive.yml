@@ -1,0 +1,23 @@
+name: Keep Supabase & App Alive
+
+on:
+  schedule:
+    # Runs every 3 days at 06:00 UTC (11:30 AM IST)
+    - cron: '0 6 */3 * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Live App & Supabase Database
+        run: |
+          echo "Pinging Vercel Production deployment..."
+          curl -s -f "https://muve-qr.vercel.app/api/qr-codes" > /dev/null || true
+
+          echo "Pinging Supabase REST API endpoint..."
+          curl -s -f "https://qokfbbcwykbdruvqwnhr.supabase.co/rest/v1/qr_codes?select=id&limit=1" \
+            -H "apikey: sb_publishable_g3D5qPwtftS5rdjYSfeDmg_MoxMSr-0" \
+            -H "Authorization: Bearer sb_publishable_g3D5qPwtftS5rdjYSfeDmg_MoxMSr-0" > /dev/null || true
+
+          echo "Keep-alive ping completed successfully!"
