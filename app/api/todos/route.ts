@@ -104,22 +104,20 @@ export async function POST(req: NextRequest) {
       console.warn('[Push] Error sending task push to staff:', pushErr)
     }
 
-    // 2. Insert into global Supabase notifications table ONLY if this is a broadcast for ALL staff
-    if (newTodo.user_id === 'all') {
-      try {
-        const isSupabaseConfigured =
-          !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
-          !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
-        if (isSupabaseConfigured) {
-          await (supabaseAdmin as any).from('notifications').insert({
-            type: 'alert',
-            title: `📋 Task: ${title.trim()}`,
-            message: description ? description.trim() : `Assigned by ${assigned_by || 'Admin'}`,
-            is_read: false,
-          })
-        }
-      } catch (e) {}
-    }
+    // 2. Insert into global Supabase notifications table for instant Realtime & modal alerts
+    try {
+      const isSupabaseConfigured =
+        !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+        !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+      if (isSupabaseConfigured) {
+        await (supabaseAdmin as any).from('notifications').insert({
+          type: 'alert',
+          title: `📋 Task: ${title.trim()}`,
+          message: description ? description.trim() : `Assigned by ${assigned_by || 'Admin'}`,
+          is_read: false,
+        })
+      }
+    } catch (e) {}
 
     return NextResponse.json({ success: true, todo: saved })
   } catch (err: any) {

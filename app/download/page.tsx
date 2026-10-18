@@ -131,9 +131,9 @@ export default function DownloadPage() {
             <div className="flex items-center justify-between pb-6 border-b border-white/10 mb-6">
               <div className="flex items-center gap-4">
                 <img 
-                  src="/logo.png" 
-                  alt="MUVE QR" 
-                  className="w-16 h-16 rounded-2xl border border-[#D4FC04]/40 shadow-lg object-cover bg-navy-950 flex-shrink-0" 
+                  src="/muve-logo.jpg" 
+                  alt="MUVE COLOMBO" 
+                  className="w-16 h-16 rounded-2xl border border-[#D4FC04]/40 shadow-lg object-contain bg-[#0a1d36] flex-shrink-0" 
                 />
                 <div>
                   <span className="text-xs font-bold text-[#D4FC04] uppercase tracking-wider">Official Android Release</span>

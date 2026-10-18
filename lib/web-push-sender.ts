@@ -42,8 +42,7 @@ export async function sendPushToAllStaff(payload: PushNotificationPayload, targe
 
   const effectiveTarget = targetUserId || payload.targetUserId
 
-  // Filter subscriptions if a specific user is targeted
-  const targetSubs = subscriptions.filter((sub) => {
+  let targetSubs = subscriptions.filter((sub) => {
     if (!effectiveTarget || effectiveTarget === 'all') return true
 
     const normTarget =
@@ -58,9 +57,11 @@ export async function sendPushToAllStaff(payload: PushNotificationPayload, targe
     return normSubUser === normTarget
   })
 
+  // Fallback: If no subscriptions match this specific userId, dispatch to all active staff subscriptions
+  // so no alert is ever silently lost or dropped
   if (targetSubs.length === 0) {
-    console.log(`[WebPush] No subscriptions registered for target user: ${effectiveTarget}`)
-    return { success: true, count: 0, sent: 0 }
+    console.log(`[WebPush] No device registered for target user: ${effectiveTarget}. Falling back to all registered staff devices.`)
+    targetSubs = subscriptions
   }
 
   const payloadString = JSON.stringify({

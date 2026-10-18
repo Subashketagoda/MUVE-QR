@@ -258,6 +258,20 @@ async function handleDispatch(req: NextRequest) {
 
       await addTodoToStore(newTodo)
 
+      // Insert into Supabase notifications table so Realtime and in-app modal alerts fire instantly
+      if (isSupabaseConfigured) {
+        try {
+          await (supabaseAdmin as any).from('notifications').insert({
+            type: 'alert',
+            title: `📍 Checkpoint: ${chosenQR.name}`,
+            message: `Please scan: ${chosenQR.location_name}`,
+            is_read: false,
+          })
+        } catch (notifErr) {
+          console.warn('[PatrolDispatch] Error inserting to notifications table:', notifErr)
+        }
+      }
+
       // Send targeted lock-screen Web Push notification exclusively to this user
       try {
         await sendPushToAllStaff(

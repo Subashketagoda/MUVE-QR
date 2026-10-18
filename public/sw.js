@@ -45,6 +45,16 @@ self.addEventListener('push', (event) => {
     ],
   }
 
+  // Broadcast to open client tabs so in-app modal popup opens simultaneously
+  self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+    clients.forEach((client) => {
+      client.postMessage({
+        type: 'PUSH_NOTIFICATION_RECEIVED',
+        payload,
+      })
+    })
+  })
+
   event.waitUntil(self.registration.showNotification(payload.title, options))
 })
 
