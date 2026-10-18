@@ -57,8 +57,8 @@ export async function middleware(request: NextRequest) {
 
   const hasSession = !!sessionUser
 
-  const publicRoutes = ['/login', '/scan', '/download', '/app']
-  const isPublic = publicRoutes.some((r) => pathname.startsWith(r)) || pathname === '/'
+  const publicRoutes = ['/login', '/scan', '/download', '/app', '/sw.js', '/manifest.json']
+  const isPublic = publicRoutes.some((r) => pathname.startsWith(r) || pathname === r) || pathname === '/'
 
   if (!hasSession && !isPublic) {
     return NextResponse.redirect(new URL('/login', request.url))
@@ -78,6 +78,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 }
