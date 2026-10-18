@@ -223,10 +223,10 @@ export default function AdminPerformancePage() {
   const exportPerformanceCSV = () => {
     if (!perfData) return
     const rows = [
-      ['MUVE QR Live Patrol TV Leaderboard', `Timeframe: ${timeframe}`, `Generated: ${new Date().toLocaleString()}`],
+      ['MUVE QR Live Staff Patrol TV Leaderboard', `Timeframe: ${timeframe}`, `Generated: ${new Date().toLocaleString()}`],
       [],
-      ['Officer Leaderboard'],
-      ['Rank', 'Officer Name', 'Contact', 'Total Scans', 'Distinct Checkpoints', 'Coverage %', 'Pace (mins)', 'Status', 'Last Location', 'Last Scan Time'],
+      ['Staff Patrol Leaderboard'],
+      ['Rank', 'Staff Member', 'Contact', 'Total Scans', 'Distinct Checkpoints', 'Coverage %', 'Pace (mins)', 'Status', 'Last Location', 'Last Scan Time'],
       ...perfData.officerLeaderboard.map((o: any, idx: number) => [
         `#${idx + 1}`,
         o.full_name,
@@ -307,10 +307,10 @@ export default function AdminPerformancePage() {
             </div>
 
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white flex items-center gap-3">
-              OFFICER PATROL LEADERBOARD
+              STAFF PATROL LEADERBOARD
             </h1>
             <p className="text-slate-400 text-xs sm:text-sm mt-0.5 font-medium">
-              Real-time security patrol rankings, perimeter inspection velocity & checkpoint coverage
+              Real-time staff patrol rankings, perimeter inspection velocity & checkpoint coverage
             </p>
           </div>
         </div>
@@ -463,7 +463,7 @@ export default function AdminPerformancePage() {
             <div className="flex items-center justify-between mb-4">
               <span className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#D4FC04] text-slate-950 font-black text-xs uppercase tracking-wider shadow-md shadow-[#D4FC04]/30">
                 <Crown className="w-4 h-4 fill-slate-950" />
-                #1 PATROL LEADER
+                #1 STAFF PATROL LEADER
               </span>
               <span className="text-3xl font-black text-[#D4FC04]">👑 1st</span>
             </div>
@@ -600,7 +600,7 @@ export default function AdminPerformancePage() {
             </div>
             <div>
               <h2 className="text-lg lg:text-xl font-black tracking-tight">
-                FULL SQUAD STANDINGS & ACTIVITY ROSTER
+                FULL STAFF STANDINGS & ACTIVITY ROSTER
               </h2>
               <p className="text-xs text-slate-400">
                 Live auto-updating every 3 seconds · Last synced {lastUpdated.toLocaleTimeString()}
@@ -628,7 +628,7 @@ export default function AdminPerformancePage() {
                 }`}
               >
                 <th className="py-4 px-6 text-center w-20">Rank</th>
-                <th className="py-4 px-6">Officer Name & Contact</th>
+                <th className="py-4 px-6">Staff Member & Contact</th>
                 <th className="py-4 px-6 text-center">Total Scans</th>
                 <th className="py-4 px-6">Checkpoint Coverage</th>
                 <th className="py-4 px-6 text-center">Coverage %</th>
@@ -788,7 +788,7 @@ export default function AdminPerformancePage() {
               ) : (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400 text-base font-bold">
-                    No officer patrol logs found for {timeframe}
+                    No staff patrol logs found for {timeframe}
                   </td>
                 </tr>
               )}
