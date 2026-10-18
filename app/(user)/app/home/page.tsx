@@ -208,6 +208,18 @@ export default function UserHomePage() {
 
     toast.info('Lock Alert dispatched! Lock your phone screen NOW to test (3s timer).', { duration: 5000 })
 
+    // 0. Trigger the gorgeous Incident Popup Modal immediately on screen
+    window.dispatchEvent(
+      new CustomEvent('muve-trigger-alert-popup', {
+        detail: {
+          id: `test_${Date.now()}`,
+          title: '🚨 Public Report: PLUMBING at 01st Floor - Ladies Washroom',
+          message: 'Visitor (Kasun Perera) reported: Water overflow from sink tap, floor is slippery. (HIGH)',
+          created_at: new Date().toISOString(),
+        },
+      })
+    )
+
     // 1. Direct Service Worker notification
     setTimeout(() => {
       if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {

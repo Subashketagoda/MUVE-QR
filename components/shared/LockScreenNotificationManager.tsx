@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState, useCallback, useRef } from 'react'
-import { Bell, BellRing, Volume2, ShieldAlert, CheckCircle2, X } from 'lucide-react'
+import { Bell, BellRing, Volume2, ShieldAlert, CheckCircle2, X, MapPin, User, ArrowRight, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase/client'
 
@@ -297,45 +297,153 @@ export function LockScreenNotificationManager() {
       }
     } catch (e) {}
 
+    const onCustomAlert = (ev: any) => {
+      if (ev.detail) {
+        handleNewAlert(ev.detail)
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('muve-trigger-alert-popup', onCustomAlert)
+    }
+
     return () => {
       clearInterval(pollInterval)
       if (channel) supabase.removeChannel(channel)
       if (bc) bc.close()
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('muve-trigger-alert-popup', onCustomAlert)
+      }
     }
   }, [handleNewAlert])
+
+  // Helper to parse title and message details
+  const parsedReport = incomingAlert
+    ? (() => {
+        let category = 'MAINTENANCE'
+        let location = 'Verified Checkpoint'
+        let details = incomingAlert.message || ''
+        let reporter = 'Public Visitor'
+        let priority = 'HIGH'
+
+        if (incomingAlert.title) {
+          const match = incomingAlert.title.match(/(?:Report:\s*)?([A-Za-z0-9_-]+)\s+at\s+(.+)$/i)
+          if (match) {
+            category = match[1].toUpperCase()
+            location = match[2]
+          } else {
+            location = incomingAlert.title.replace(/^🚨\s*(?:Public Report:\s*)?/, '')
+          }
+        }
+
+        if (incomingAlert.message) {
+          const repMatch = incomingAlert.message.match(/^(.+?)\s+reported:\s+(.+?)(?:\s*\(([A-Z]+)\))?$/i)
+          if (repMatch) {
+            reporter = repMatch[1]
+            details = repMatch[2]
+            if (repMatch[3]) priority = repMatch[3]
+          }
+        }
+
+        return {
+          category,
+          location,
+          details,
+          reporter,
+          priority,
+          time: incomingAlert.created_at
+            ? new Date(incomingAlert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : 'Just now',
+        }
+      })()
+    : null
 
   return (
     <>
       {/* ============================================================
-          1. FLOATING EMERGENCY BANNER (When a new report arrives)
+          1. RICH EMERGENCY INCIDENT POPUP MODAL (When a report arrives)
           ============================================================ */}
-      {incomingAlert && (
-        <div className="fixed top-3 left-3 right-3 sm:left-auto sm:right-6 sm:w-96 z-50 animate-bounce">
-          <div className="p-4 rounded-2xl bg-red-600 text-white shadow-2xl border-2 border-white/30 flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-white text-red-600 font-black flex-shrink-0 animate-pulse">
-                <ShieldAlert className="w-6 h-6" />
+      {incomingAlert && parsedReport && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-sm rounded-[32px] bg-gradient-to-b from-[#0F1E36] via-[#091527] to-[#040B14] border-2 border-rose-500/80 shadow-[0_0_60px_rgba(244,63,94,0.35)] overflow-hidden text-white animate-in zoom-in-95 duration-200">
+            {/* Top Red Glow Accent & Pulsing Light */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-rose-500 via-amber-400 to-rose-500 animate-pulse" />
+
+            <div className="p-6">
+              {/* Header Bar */}
+              <div className="flex items-center justify-between mb-4">
+                <span className="flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[11px] font-black uppercase tracking-wider">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                  INCIDENT ALERT DISPATCHED
+                </span>
+
+                <button
+                  onClick={() => setIncomingAlert(null)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <div>
-                <p className="text-xs font-black uppercase tracking-wider text-red-100">
-                  🚨 NEW INCIDENT REPORT
-                </p>
-                <h4 className="text-sm font-extrabold leading-tight mt-0.5">{incomingAlert.title}</h4>
-                <p className="text-xs text-red-100 mt-1 line-clamp-2">{incomingAlert.message}</p>
+
+              {/* Siren Icon with Location Details */}
+              <div className="flex items-center gap-3.5 mb-4">
+                <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-tr from-rose-600 to-orange-500 flex items-center justify-center text-white shadow-lg shadow-rose-600/40 flex-shrink-0 animate-pulse">
+                  <ShieldAlert className="w-8 h-8" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-950 text-rose-300 border border-rose-700/60">
+                      {parsedReport.category}
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {parsedReport.time}
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black tracking-tight text-white mt-1 leading-snug">
+                    {parsedReport.location}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Report Details Box */}
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2 mb-4">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400 font-medium flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Reported by:</span>
+                  </span>
+                  <span className="font-bold text-white text-xs">{parsedReport.reporter}</span>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">
+                    Issue Details:
+                  </p>
+                  <p className="text-xs text-slate-200 leading-relaxed font-medium bg-black/40 p-2.5 rounded-xl border border-white/5">
+                    {parsedReport.details}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2">
                 <a
                   href="/app/tasks"
-                  className="inline-block mt-2 px-3 py-1 bg-white text-red-700 font-black text-xs rounded-lg shadow hover:bg-red-50 transition-colors"
+                  onClick={() => setIncomingAlert(null)}
+                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-[#D4FC04] via-lime-400 to-[#D4FC04] text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#D4FC04]/25 hover:brightness-105 active:scale-[0.98] transition cursor-pointer"
                 >
-                  Open Task Checklist →
+                  <span>Open Task Checklist</span>
+                  <ArrowRight className="w-4 h-4" />
                 </a>
+
+                <button
+                  onClick={() => setIncomingAlert(null)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Acknowledge & Close</span>
+                </button>
               </div>
             </div>
-            <button
-              onClick={() => setIncomingAlert(null)}
-              className="text-white/80 hover:text-white p-1 rounded-lg"
-            >
-              <X className="w-5 h-5" />
-            </button>
           </div>
         </div>
       )}
