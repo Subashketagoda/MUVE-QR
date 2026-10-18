@@ -143,12 +143,23 @@ export function LockScreenNotificationManager() {
   }, [])
 
   // 5. Initialize Service Worker & check permission on mount
+  const isInitialLoadRef = useRef(true)
+
+  const saveSeenIds = useCallback(() => {
+    try {
+      localStorage.setItem(
+        'muve_seen_alert_ids',
+        JSON.stringify(Array.from(seenAlertIdsRef.current).slice(-200))
+      )
+    } catch (e) {}
+  }, [])
+
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // Load previously seen alert IDs from sessionStorage
+    // Load previously seen alert IDs from localStorage (persists across re-logins)
     try {
-      const stored = sessionStorage.getItem('muve_seen_alert_ids')
+      const stored = localStorage.getItem('muve_seen_alert_ids')
       if (stored) {
         JSON.parse(stored).forEach((id: string) => seenAlertIdsRef.current.add(id))
       }
@@ -223,17 +234,15 @@ export function LockScreenNotificationManager() {
 
   // 8. Handle Incoming Alert Detection (Realtime + Polling fallback)
   const handleNewAlert = useCallback(
-    (alert: { id?: string; title: string; message: string; created_at?: string }) => {
+    (alert: { id?: string; title: string; message: string; created_at?: string; is_read?: boolean }) => {
+      // NEVER trigger alerts for already-done or read tasks
+      if (alert.is_read) return
+
       const alertId = alert.id || `${alert.title}_${alert.created_at || Date.now()}`
       if (seenAlertIdsRef.current.has(alertId)) return
 
       seenAlertIdsRef.current.add(alertId)
-      try {
-        sessionStorage.setItem(
-          'muve_seen_alert_ids',
-          JSON.stringify(Array.from(seenAlertIdsRef.current))
-        )
-      } catch (e) {}
+      saveSeenIds()
 
       // Trigger lock screen notification, vibration, and loud audio
       triggerLockScreenNotification(alert.title, alert.message, '/app/tasks', alertId)
@@ -241,7 +250,7 @@ export function LockScreenNotificationManager() {
       // Set in-app floating emergency banner
       setIncomingAlert(alert)
     },
-    [triggerLockScreenNotification]
+    [triggerLockScreenNotification, saveSeenIds]
   )
 
   // 9. Subscribe to Supabase Realtime 'notifications' table
@@ -255,7 +264,8 @@ export function LockScreenNotificationManager() {
           { event: 'INSERT', schema: 'public', table: 'notifications' },
           (payload: any) => {
             const notif = payload.new
-            if (notif && notif.type !== 'scan') {
+            // Only fire for unread and non-scan notifications
+            if (notif && notif.type !== 'scan' && !notif.is_read) {
               handleNewAlert(notif)
             }
           }
@@ -263,18 +273,29 @@ export function LockScreenNotificationManager() {
         .subscribe()
     } catch (e) {}
 
-    // Polling fallback every 3.5s to ensure zero missed notifications or tasks
+    // Polling fallback to ensure zero missed notifications
     const pollInterval = setInterval(async () => {
       try {
         const res = await fetch(`/api/notifications?t=${Date.now()}`, { cache: 'no-store' })
         const json = await res.json()
         if (json.success && Array.isArray(json.notifications)) {
-          // Check most recent 10 notifications (excluding routine patrol scans)
-          const recentAlerts = json.notifications
-            .slice(0, 10)
-            .filter((n: any) => n.type !== 'scan')
+          // On first load/mount after login: seed all existing notifications so past ones never trigger popups!
+          if (isInitialLoadRef.current) {
+            isInitialLoadRef.current = false
+            for (const n of json.notifications) {
+              const id = n.id || n.title
+              seenAlertIdsRef.current.add(id)
+            }
+            saveSeenIds()
+            return
+          }
 
-          for (const alert of recentAlerts) {
+          // Check only unread and non-scan notifications
+          const unreadAlerts = json.notifications
+            .slice(0, 10)
+            .filter((n: any) => n.type !== 'scan' && !n.is_read)
+
+          for (const alert of unreadAlerts) {
             const alertId = alert.id || alert.title
             if (!seenAlertIdsRef.current.has(alertId)) {
               handleNewAlert(alert)
@@ -290,7 +311,7 @@ export function LockScreenNotificationManager() {
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
         bc = new BroadcastChannel('muve_alerts_bus')
         bc.onmessage = (ev) => {
-          if (ev.data && ev.data.alert) {
+          if (ev.data && ev.data.alert && !ev.data.alert.is_read) {
             handleNewAlert(ev.data.alert)
           }
         }
@@ -298,7 +319,7 @@ export function LockScreenNotificationManager() {
     } catch (e) {}
 
     const onCustomAlert = (ev: any) => {
-      if (ev.detail) {
+      if (ev.detail && !ev.detail.is_read) {
         handleNewAlert(ev.detail)
       }
     }
@@ -314,7 +335,7 @@ export function LockScreenNotificationManager() {
         window.removeEventListener('muve-trigger-alert-popup', onCustomAlert)
       }
     }
-  }, [handleNewAlert])
+  }, [handleNewAlert, saveSeenIds])
 
   // Helper to parse title and message details
   const parsedReport = incomingAlert
