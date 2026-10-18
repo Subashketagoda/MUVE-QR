@@ -55,7 +55,7 @@ export default function LoginPage() {
         {/* Header Branding */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-3">
-            <Logo size="lg" showSubtitle={true} subtitleText="COLOMBO" />
+            <Logo size="lg" showSubtitle={true} subtitleText="QR SYSTEM" />
           </div>
           <p className="text-sm font-semibold tracking-widest text-[#D4FC04] uppercase mt-2">
             SCAN • TRACK • MOVE FORWARD

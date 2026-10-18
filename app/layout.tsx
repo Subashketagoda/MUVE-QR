@@ -6,13 +6,13 @@ import { Toaster } from "sonner";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "MUVE QR — SCAN • TRACK • MOVE FORWARD",
-  description: "Enterprise QR-code-based activity, attendance, and location tracking platform.",
+  title: "MUVE COLOMBO QR SYSTEM",
+  description: "Enterprise QR-code-based activity, attendance, and location tracking platform for MUVE COLOMBO.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "MUVE QR",
+    title: "MUVE COLOMBO QR SYSTEM",
   },
   icons: {
     icon: [
@@ -47,7 +47,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="MUVE QR" />
+        <meta name="apple-mobile-web-app-title" content="MUVE COLOMBO QR" />
       </head>
       <body className={inter.className}>
         {children}

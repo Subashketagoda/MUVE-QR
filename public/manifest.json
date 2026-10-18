@@ -1,7 +1,7 @@
 {
-  "name": "MUVE QR — Scan & Track",
+  "name": "MUVE COLOMBO QR SYSTEM",
   "short_name": "MUVE QR",
-  "description": "Enterprise QR-code-based activity, attendance, and location tracking platform.",
+  "description": "Enterprise QR-code-based activity, attendance, and location tracking platform for MUVE COLOMBO.",
   "start_url": "/app/home",
   "display": "standalone",
   "background_color": "#050d1a",

@@ -54,7 +54,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, setMobil
         {/* Header Branding */}
         <div className="p-6 flex items-center justify-between border-b border-slate-800">
           <Link href="/admin/dashboard" className="inline-block">
-            <Logo size="sm" showSubtitle={true} subtitleText="COLOMBO" />
+            <Logo size="sm" showSubtitle={true} subtitleText="QR SYSTEM" />
           </Link>
           <button
             onClick={() => setMobileOpen(false)}

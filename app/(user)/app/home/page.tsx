@@ -269,7 +269,7 @@ export default function UserHomePage() {
         <div className="relative z-10 space-y-5">
           {/* Top Bar with Logo and Status */}
           <div className="flex items-center justify-between">
-            <Logo size="sm" showSubtitle={true} subtitleText="COLOMBO" variant="dark" />
+            <Logo size="sm" showSubtitle={true} subtitleText="QR SYSTEM" variant="dark" />
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] font-semibold text-emerald-300">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>Live Ready</span>
