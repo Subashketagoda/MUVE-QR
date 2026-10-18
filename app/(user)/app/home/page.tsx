@@ -20,8 +20,11 @@ import {
   CheckSquare,
   Check,
   Plus,
+  Bell,
+  BellRing,
 } from 'lucide-react'
 import { TodoRow } from '@/types/database'
+import { toast } from 'sonner'
 
 export default function UserHomePage() {
   const [user, setUser] = useState<any>(null)
@@ -156,6 +159,37 @@ export default function UserHomePage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleTestLockScreenAlert = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission !== 'granted') {
+        const res = await Notification.requestPermission()
+        if (res !== 'granted') {
+          toast.info('Please allow notification permission to test lock screen alerts.')
+          return
+        }
+      }
+    }
+    toast.info('Test Alert dispatched! Lock your phone screen now to test.', { duration: 4500 })
+    setTimeout(() => {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SHOW_LOCKSCREEN_NOTIFICATION',
+          title: '🚨 TEST REPORT: 01st Floor - Ladies Washroom',
+          body: 'Visitor reported: Water leakage near sink (HIGH PRIORITY) — Lock Screen Alert Test',
+          data: { url: '/app/tasks' },
+        })
+      } else if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('🚨 TEST REPORT: 01st Floor - Ladies Washroom', {
+          body: 'Visitor reported: Water leakage near sink (HIGH PRIORITY) — Lock Screen Alert Test',
+          icon: '/icons/icon-192.png',
+        })
+      }
+      try {
+        if ('vibrate' in navigator) navigator.vibrate([400, 200, 400, 200, 600])
+      } catch (e) {}
+    }, 1500)
   }
 
   return (
@@ -308,6 +342,28 @@ export default function UserHomePage() {
             <Download className="w-4 h-4" />
           </div>
         </Link>
+
+        {/* Lock Screen & Audio Alerts Status Widget */}
+        <div className="bg-gradient-to-r from-slate-900 to-[#072B3B] text-white p-3.5 rounded-2xl border border-slate-800 shadow-sm flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+              <Bell className="w-4 h-4 animate-pulse" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-black tracking-tight text-white truncate">Lock Screen Alerts</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
+              </div>
+              <p className="text-[10px] text-slate-300 truncate">Instant vibration & sound for visitor reports</p>
+            </div>
+          </div>
+          <button
+            onClick={handleTestLockScreenAlert}
+            className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-[#D4FC04] text-[11px] font-black rounded-lg border border-white/15 transition cursor-pointer flex-shrink-0 active:scale-95"
+          >
+            Test Alert
+          </button>
+        </div>
 
         {/* User Daily Checklist / To-Do Card */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3">

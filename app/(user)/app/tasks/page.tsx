@@ -455,7 +455,12 @@ export default function UserTasksPage() {
                           )}
                           {todo.user_id === 'all' && (
                             <span className="text-[10px] font-extrabold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full border border-purple-200">
-                              📢 All Users
+                              📢 All Staff
+                            </span>
+                          )}
+                          {todo.assigned_by?.includes('Public Checkpoint Scan') && (
+                            <span className="text-[10px] font-extrabold bg-red-100 text-red-800 px-2 py-0.5 rounded-full border border-red-300 animate-pulse">
+                              🚨 Public Report
                             </span>
                           )}
                         </div>

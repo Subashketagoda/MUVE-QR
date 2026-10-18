@@ -314,7 +314,7 @@ export default function UserScanPage() {
     const images: Record<string, string> = {}
     for (const item of list) {
       try {
-        const scanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muveqr.app/scan'}/${item.token}`
+        const scanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muve-qr.vercel.app/scan'}/${item.token}`
         const url = await QRCode.toDataURL(scanUrl, { width: 300, margin: 2 })
         images[item.id] = url
       } catch (e) {}

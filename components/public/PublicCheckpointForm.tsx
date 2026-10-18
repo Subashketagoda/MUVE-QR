@@ -15,7 +15,6 @@ import {
   Send,
   Loader2,
   Clock,
-  ArrowRight,
   User,
   Phone,
   Building,
@@ -440,20 +439,6 @@ export const PublicCheckpointForm: React.FC<PublicCheckpointFormProps> = ({ toke
             )}
           </button>
         </form>
-
-        {/* Security Officer Login Callout */}
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-center space-y-1">
-          <p className="text-xs text-slate-400">
-            Are you an on-duty Security Patrol Officer?
-          </p>
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors"
-          >
-            <span>Log in to MUVE Patrol System</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
       </div>
 
       {/* Footer */}

@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { INITIAL_TODOS, INITIAL_NOTIFICATIONS, INITIAL_QR_CODES } from '@/lib/demo-store'
 import backupQRCodes from '@/lib/initial-qr-codes.json'
 import { TodoRow, NotificationRow, QRCodeRow } from '@/types/database'
+import { sendPushToAllStaff } from '@/lib/web-push-sender'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -94,13 +95,20 @@ export async function POST(req: NextRequest) {
 
     if (isSupabaseConfigured) {
       try {
-        await (supabaseAdmin as any).from('todos').insert(newTodo)
+        const { id, ...todoWithoutCustomId } = newTodo
+        await (supabaseAdmin as any).from('todos').insert(todoWithoutCustomId)
       } catch (e) {
         console.warn('Could not insert into Supabase todos table, storing in-memory:', e)
       }
 
       try {
-        await (supabaseAdmin as any).from('notifications').insert(newNotif)
+        await (supabaseAdmin as any).from('notifications').insert({
+          type: 'alert',
+          title: newNotif.title,
+          message: newNotif.message,
+          scan_id: null,
+          is_read: false,
+        })
       } catch (e) {
         console.warn('Could not insert notification into Supabase:', e)
       }
@@ -109,6 +117,20 @@ export async function POST(req: NextRequest) {
     // Always store in memory demo store as well
     INITIAL_TODOS.unshift(newTodo)
     INITIAL_NOTIFICATIONS.unshift(newNotif)
+
+    // 3. Dispatch native lock-screen web push to ALL staff devices
+    try {
+      await sendPushToAllStaff({
+        title: `🚨 [${cleanCategory}] ${locationName}`,
+        body: `${reporterName || 'Visitor'} reported: ${description || cleanCategory} (${priority.toUpperCase()})`,
+        url: '/app/tasks',
+        tag: `muve-report-${ticketId}`,
+        category: cleanCategory,
+        priority: priority,
+      })
+    } catch (pushErr) {
+      console.warn('[WebPush] Error broadcasting to staff devices:', pushErr)
+    }
 
     return NextResponse.json({
       success: true,

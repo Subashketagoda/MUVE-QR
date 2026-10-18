@@ -3,12 +3,14 @@
 import React, { useState } from 'react'
 import { AdminSidebar } from '@/components/admin/AdminSidebar'
 import { AdminTopNav } from '@/components/admin/AdminTopNav'
+import { LockScreenNotificationManager } from '@/components/shared/LockScreenNotificationManager'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
     <div className="admin-layout">
+      <LockScreenNotificationManager />
       <AdminSidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       <div className="admin-main">
         <AdminTopNav onMenuClick={() => setMobileOpen(true)} />

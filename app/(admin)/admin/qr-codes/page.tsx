@@ -184,7 +184,7 @@ export default function QRCodesPage() {
     setPreviewQR(qr)
     try {
       // The QR image encodes the full scan URL
-      const qrScanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muveqr.app/scan'}/${qr.token}`
+      const qrScanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muve-qr.vercel.app/scan'}/${qr.token}`
       const url = await QRCode.toDataURL(qrScanUrl, {
         width: 400,
         margin: 2,
@@ -203,7 +203,7 @@ export default function QRCodesPage() {
     try {
       let finalUrl = dataUrl || qrImageDataUrl
       if (!finalUrl) {
-        const qrScanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muveqr.app/scan'}/${qr.token}`
+        const qrScanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muve-qr.vercel.app/scan'}/${qr.token}`
         finalUrl = await QRCode.toDataURL(qrScanUrl, {
           width: 800,
           margin: 2,
@@ -260,7 +260,7 @@ export default function QRCodesPage() {
       const { jsPDF } = await import('jspdf')
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
-      const qrScanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muveqr.app/scan'}/${qr.token}`
+      const qrScanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muve-qr.vercel.app/scan'}/${qr.token}`
       const url = await QRCode.toDataURL(qrScanUrl, { width: 600, margin: 2 })
 
       // Header branding
@@ -315,7 +315,7 @@ export default function QRCodesPage() {
     const printWindow = window.open('', '_blank')
     if (!printWindow) return
 
-    const qrScanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muveqr.app/scan'}/${qr.token}`
+    const qrScanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muve-qr.vercel.app/scan'}/${qr.token}`
 
     QRCode.toDataURL(qrScanUrl, { width: 500, margin: 2 }, (err: any, url: any) => {
       printWindow.document.write(`
@@ -365,7 +365,7 @@ export default function QRCodesPage() {
       const zip = new JSZip()
       const folder = zip.folder('MUVE_QR_Codes') || zip
 
-      const baseUrl = process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muveqr.app/scan'
+      const baseUrl = process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muve-qr.vercel.app/scan'
 
       for (let i = 0; i < listToDownload.length; i++) {
         const qr = listToDownload[i]
@@ -427,7 +427,7 @@ export default function QRCodesPage() {
     try {
       const { jsPDF } = await import('jspdf')
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      const baseUrl = process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muveqr.app/scan'
+      const baseUrl = process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muve-qr.vercel.app/scan'
 
       for (let i = 0; i < listToDownload.length; i++) {
         const qr = listToDownload[i]
@@ -803,7 +803,7 @@ function QRCard({
   const [dataUrl, setDataUrl] = useState('')
 
   useEffect(() => {
-    const qrScanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muveqr.app/scan'}/${qr.token}`
+    const qrScanUrl = `${process.env.NEXT_PUBLIC_QR_BASE_URL || 'https://muve-qr.vercel.app/scan'}/${qr.token}`
     QRCode.toDataURL(qrScanUrl, { width: 200, margin: 1, color: { dark: '#072B3B', light: '#FFFFFF' } }).then(
       setDataUrl
     )

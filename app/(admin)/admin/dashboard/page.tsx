@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   ChevronRight,
   Check,
+  Trophy,
 } from 'lucide-react'
 import { TodoRow } from '@/types/database'
 import { toast } from 'sonner'
@@ -169,7 +170,11 @@ export default function AdminDashboardPage() {
             Real-time activity metrics and location scanning analytics
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/admin/performance" className="btn btn-secondary btn-sm border-slate-300 hover:border-slate-400">
+            <Trophy className="w-4 h-4 text-amber-500" />
+            Staff Patrol Leaderboard
+          </Link>
           <Link href="/admin/live-scans" className="btn btn-secondary btn-sm">
             <Radio className="w-4 h-4 text-emerald-600 animate-pulse" />
             Live Scans

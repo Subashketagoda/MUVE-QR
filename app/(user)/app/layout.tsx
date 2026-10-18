@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { UserBottomNav } from '@/components/user/UserBottomNav'
+import { LockScreenNotificationManager } from '@/components/shared/LockScreenNotificationManager'
 
 export default function UserAppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -18,6 +19,9 @@ export default function UserAppLayout({ children }: { children: React.ReactNode 
         <div className="hidden sm:flex justify-center pt-2 pb-1 bg-[#072B3B]">
           <div className="w-20 h-1 rounded-full bg-white/20" />
         </div>
+
+        {/* Global Lock Screen & Sound Notification Manager */}
+        <LockScreenNotificationManager />
 
         {/* Scrollable App Viewport */}
         <main className="flex-1 pb-28 overflow-y-auto scrollbar-none overscroll-contain">

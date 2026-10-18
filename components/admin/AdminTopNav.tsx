@@ -86,16 +86,25 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({ onMenuClick }) => {
     }
   }
 
-  // Native Browser push notification
+  // Native Browser push notification (routes through Service Worker for lock screen delivery)
   const showNativeNotification = (title: string, message: string) => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission === 'granted') {
-        try {
-          new Notification(title, {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SHOW_LOCKSCREEN_NOTIFICATION',
+            title,
             body: message,
-            icon: '/favicon.ico',
+            data: { url: '/admin/todos' },
           })
-        } catch (e) {}
+        } else {
+          try {
+            new Notification(title, {
+              body: message,
+              icon: '/icons/icon-192.png',
+            })
+          } catch (e) {}
+        }
       }
     }
   }
