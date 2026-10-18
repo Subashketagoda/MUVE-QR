@@ -4,6 +4,7 @@ import { INITIAL_TODOS, INITIAL_NOTIFICATIONS, INITIAL_QR_CODES } from '@/lib/de
 import backupQRCodes from '@/lib/initial-qr-codes.json'
 import { TodoRow, NotificationRow, QRCodeRow } from '@/types/database'
 import { sendPushToAllStaff } from '@/lib/web-push-sender'
+import { addTodoToStore } from '@/lib/todos-store'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -95,23 +96,32 @@ export async function POST(req: NextRequest) {
 
     if (isSupabaseConfigured) {
       try {
-        const { id, ...todoWithoutCustomId } = newTodo
-        await (supabaseAdmin as any).from('todos').insert(todoWithoutCustomId)
-      } catch (e) {
-        console.warn('Could not insert into Supabase todos table, storing in-memory:', e)
-      }
+        const { data: notifData } = await (supabaseAdmin as any)
+          .from('notifications')
+          .insert({
+            type: 'alert',
+            title: newNotif.title,
+            message: newNotif.message,
+            scan_id: null,
+            is_read: false,
+          })
+          .select()
+          .maybeSingle()
 
-      try {
-        await (supabaseAdmin as any).from('notifications').insert({
-          type: 'alert',
-          title: newNotif.title,
-          message: newNotif.message,
-          scan_id: null,
-          is_read: false,
-        })
+        if (notifData?.id) {
+          newNotif.id = notifData.id
+          newTodo.id = notifData.id
+        }
       } catch (e) {
         console.warn('Could not insert notification into Supabase:', e)
       }
+    }
+
+    // Persist todo to Supabase settings store
+    try {
+      await addTodoToStore(newTodo)
+    } catch (e) {
+      console.warn('Could not add todo to persistent store:', e)
     }
 
     // Always store in memory demo store as well

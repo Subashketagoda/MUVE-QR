@@ -204,7 +204,7 @@ export default function UserTasksPage() {
       await fetch('/api/todos', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: todo.id, status: nextStatus }),
+        body: JSON.stringify({ id: todo.id, title: todo.title, status: nextStatus }),
       })
       if (nextStatus === 'completed') {
         toast.success('Marked as completed! Admin will review.')

@@ -426,21 +426,51 @@ export function LockScreenNotificationManager() {
 
               {/* Action Buttons */}
               <div className="space-y-2">
+                <button
+                  onClick={async () => {
+                    const alertId = incomingAlert.id
+                    try {
+                      await fetch('/api/todos', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          id: alertId,
+                          title: incomingAlert.title,
+                          status: 'completed',
+                        }),
+                      })
+                      toast.success('Incident marked as resolved & completed!')
+                      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+                        const bc = new BroadcastChannel('muve_todos_bus')
+                        bc.postMessage({ type: 'TODO_UPDATED' })
+                        bc.close()
+                      }
+                    } catch (e) {
+                      console.warn('Error resolving alert:', e)
+                    }
+                    setIncomingAlert(null)
+                  }}
+                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 hover:brightness-105 active:scale-[0.98] transition cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                  <span>Mark as Resolved & Complete</span>
+                </button>
+
                 <a
                   href="/app/tasks"
                   onClick={() => setIncomingAlert(null)}
-                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-[#D4FC04] via-lime-400 to-[#D4FC04] text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#D4FC04]/25 hover:brightness-105 active:scale-[0.98] transition cursor-pointer"
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#D4FC04] via-lime-400 to-[#D4FC04] text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-md shadow-[#D4FC04]/20 hover:brightness-105 active:scale-[0.98] transition cursor-pointer"
                 >
                   <span>Open Task Checklist</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </a>
 
                 <button
                   onClick={() => setIncomingAlert(null)}
-                  className="w-full py-2.5 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  className="w-full py-2 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Acknowledge & Close</span>
+                  <X className="w-3.5 h-3.5" />
+                  <span>Acknowledge & Dismiss</span>
                 </button>
               </div>
             </div>

@@ -111,9 +111,21 @@ export default function UserHomePage() {
       await fetch('/api/todos', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: todo.id, status: nextStatus }),
+        body: JSON.stringify({ id: todo.id, title: todo.title, status: nextStatus }),
       })
-    } catch (e) {}
+      if (nextStatus === 'completed') {
+        toast.success('Task marked as completed!')
+      } else {
+        toast.info('Task marked as pending')
+      }
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('muve_todos_bus')
+        bc.postMessage({ type: 'TODO_UPDATED' })
+        bc.close()
+      }
+    } catch (e) {
+      console.error('Error updating todo:', e)
+    }
   }
 
   const fetchUserScans = async (userId: string) => {

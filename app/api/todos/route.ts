@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase/admin'
-import { INITIAL_TODOS, INITIAL_USERS } from '@/lib/demo-store'
 import { TodoRow } from '@/types/database'
+import {
+  getAllTodosFromStore,
+  addTodoToStore,
+  updateTodoInStore,
+  deleteTodoFromStore,
+} from '@/lib/todos-store'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,78 +19,9 @@ export async function GET(req: NextRequest) {
     const priority = searchParams.get('priority')
     const search = searchParams.get('search')?.toLowerCase()
 
-    const isSupabaseConfigured =
-      !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
-
-    if (isSupabaseConfigured) {
-      try {
-        let query = (supabaseAdmin as any)
-          .from('todos')
-          .select('*')
-          .order('created_at', { ascending: false })
-
-        if (userId) {
-          query = query.or(`user_id.eq.${userId},user_id.eq.all`)
-        }
-        if (status) query = query.eq('status', status)
-        if (adminReviewed !== null && adminReviewed !== undefined && adminReviewed !== '') {
-          query = query.eq('admin_reviewed', adminReviewed === 'true')
-        }
-        if (priority) query = query.eq('priority', priority)
-        if (search) {
-          query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,user_name.ilike.%${search}%`)
-        }
-
-        const { data, error } = await query
-        if (!error && data) {
-          return NextResponse.json({ success: true, todos: data })
-        }
-      } catch (err) {
-        console.warn('Supabase todos query failed, falling back to in-memory store:', err)
-      }
-    }
-
-    // Fallback to in-memory store merged with persisted Supabase notification alerts
-    let filtered = [...INITIAL_TODOS]
-
-    if (isSupabaseConfigured) {
-      try {
-        const { data: alerts } = await (supabaseAdmin as any)
-          .from('notifications')
-          .select('*')
-          .eq('type', 'alert')
-          .order('created_at', { ascending: false })
-
-        if (Array.isArray(alerts)) {
-          for (const a of alerts) {
-            const exists = filtered.some((t) => t.id === a.id || t.title === a.title)
-            if (!exists) {
-              filtered.unshift({
-                id: a.id,
-                user_id: 'all',
-                user_name: 'Public Visitor',
-                user_phone: 'Public Checkpoint Scan',
-                title: a.title,
-                description: a.message,
-                priority: 'high',
-                status: a.is_read ? 'completed' : 'pending',
-                assigned_by: 'Public Checkpoint Scan',
-                admin_reviewed: a.is_read,
-                admin_notes: null,
-                reviewed_by: null,
-                reviewed_at: null,
-                created_at: a.created_at,
-                updated_at: a.created_at,
-              })
-            }
-          }
-        }
-      } catch (e) {}
-    }
+    let filtered = await getAllTodosFromStore()
 
     if (userId) {
-      // Normalize comparison for demo user IDs and broadcast 'all'
       filtered = filtered.filter(
         (t) =>
           t.user_id === 'all' ||
@@ -114,8 +52,6 @@ export async function GET(req: NextRequest) {
           t.user_name.toLowerCase().includes(search)
       )
     }
-
-    filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
     return NextResponse.json({ success: true, todos: filtered })
   } catch (err: any) {
@@ -150,29 +86,8 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     }
 
-    const isSupabaseConfigured =
-      !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
-
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await (supabaseAdmin as any)
-          .from('todos')
-          .insert(newTodo)
-          .select()
-          .single()
-
-        if (!error && data) {
-          return NextResponse.json({ success: true, todo: data })
-        }
-      } catch (e) {
-        console.warn('Supabase insert failed, storing in memory:', e)
-      }
-    }
-
-    // Always keep in-memory sync
-    INITIAL_TODOS.unshift(newTodo)
-    return NextResponse.json({ success: true, todo: newTodo })
+    const saved = await addTodoToStore(newTodo)
+    return NextResponse.json({ success: true, todo: saved })
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 })
   }
@@ -196,13 +111,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'Todo ID is required' }, { status: 400 })
     }
 
-    const isSupabaseConfigured =
-      !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
-
-    const updatePayload: any = {
-      updated_at: new Date().toISOString(),
-    }
+    const updatePayload: Partial<TodoRow> = {}
 
     if (status !== undefined) updatePayload.status = status
     if (title !== undefined) updatePayload.title = title
@@ -220,33 +129,9 @@ export async function PUT(req: NextRequest) {
     }
     if (admin_notes !== undefined) updatePayload.admin_notes = admin_notes
 
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await (supabaseAdmin as any)
-          .from('todos')
-          .update(updatePayload)
-          .eq('id', id)
-          .select()
-          .single()
+    const updated = await updateTodoInStore(id, updatePayload)
 
-        if (!error && data) {
-          return NextResponse.json({ success: true, todo: data })
-        }
-      } catch (e) {
-        console.warn('Supabase update failed, updating in memory:', e)
-      }
-    }
-
-    const index = INITIAL_TODOS.findIndex((t) => t.id === id)
-    if (index !== -1) {
-      INITIAL_TODOS[index] = {
-        ...INITIAL_TODOS[index],
-        ...updatePayload,
-      }
-      return NextResponse.json({ success: true, todo: INITIAL_TODOS[index] })
-    }
-
-    return NextResponse.json({ success: true, message: 'Updated locally' })
+    return NextResponse.json({ success: true, todo: updated })
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 })
   }
@@ -261,23 +146,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'Todo ID is required' }, { status: 400 })
     }
 
-    const isSupabaseConfigured =
-      !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
-
-    if (isSupabaseConfigured) {
-      try {
-        await (supabaseAdmin as any).from('todos').delete().eq('id', id)
-      } catch (e) {
-        console.warn('Supabase delete failed:', e)
-      }
-    }
-
-    const index = INITIAL_TODOS.findIndex((t) => t.id === id)
-    if (index !== -1) {
-      INITIAL_TODOS.splice(index, 1)
-    }
-
+    await deleteTodoFromStore(id)
     return NextResponse.json({ success: true, message: 'Deleted successfully' })
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message }, { status: 500 })
