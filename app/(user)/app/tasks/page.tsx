@@ -18,8 +18,10 @@ import {
   X,
   Filter,
   Check,
+  QrCode,
+  MapPin,
 } from 'lucide-react'
-import { TodoRow, TodoPriority } from '@/types/database'
+import { TodoRow, TodoPriority, TodoStatus } from '@/types/database'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
@@ -192,7 +194,7 @@ export default function UserTasksPage() {
   }
 
   const handleToggleStatus = async (todo: TodoRow) => {
-    const nextStatus = todo.status === 'completed' ? 'pending' : 'completed'
+    const nextStatus: TodoStatus = todo.status === 'completed' ? 'pending' : 'completed'
     const updatedList = todos.map((t) =>
       t.id === todo.id ? { ...t, status: nextStatus, updated_at: new Date().toISOString() } : t
     )
@@ -248,6 +250,11 @@ export default function UserTasksPage() {
   const completedCount = todos.filter((t) => t.status === 'completed').length
   const pendingCount = todos.filter((t) => t.status === 'pending').length
   const reviewedCount = todos.filter((t) => t.admin_reviewed).length
+  const pendingPatrols = todos.filter(
+    (t) =>
+      t.status === 'pending' &&
+      (t.assigned_by === 'Automated Patrol Dispatch' || t.title.includes('📍 Checkpoint'))
+  )
 
   return (
     <div className="space-y-4 pb-12">
@@ -315,6 +322,39 @@ export default function UserTasksPage() {
       </div>
 
       <div className="px-4 space-y-3">
+        {/* Pending Checkpoints Banner (Anti-Spoofing Patrol) */}
+        {pendingPatrols.length > 0 && (
+          <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-2xl p-4 border border-indigo-500/30 shadow-lg space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+                <h3 className="font-extrabold text-sm text-indigo-100">
+                  Pending Checkpoint Inspection ({pendingPatrols.length})
+                </h3>
+              </div>
+              <span className="text-[10px] font-bold bg-indigo-500/30 text-indigo-200 px-2 py-0.5 rounded-full border border-indigo-400/30">
+                Random Patrol
+              </span>
+            </div>
+            <p className="text-xs text-slate-300">
+              You have {pendingPatrols.length} assigned office checkpoint{pendingPatrols.length > 1 ? 's' : ''} awaiting physical scan.
+            </p>
+            <div className="pt-1 flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-amber-300 truncate max-w-[210px] flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                {pendingPatrols[0].title.replace(/^📍\s*(?:Checkpoint:\s*)?/, '')}
+              </span>
+              <Link
+                href="/app/scan"
+                className="btn bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1.5 px-3 font-bold flex items-center gap-1.5 rounded-xl shrink-0 shadow-md shadow-indigo-500/30"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span>Scan Now</span>
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Filter Pills */}
         <div className="flex items-center gap-1.5 p-1 bg-slate-200/80 rounded-2xl text-xs font-bold overflow-x-auto scrollbar-none">
           <button
@@ -448,7 +488,12 @@ export default function UserTasksPage() {
                           >
                             {pBadge.label}
                           </span>
-                          {todo.assigned_by && (
+                          {todo.assigned_by === 'Automated Patrol Dispatch' && (
+                            <span className="text-[10px] font-extrabold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full border border-indigo-200 flex items-center gap-1">
+                              📍 Patrol Checkpoint
+                            </span>
+                          )}
+                          {todo.assigned_by && todo.assigned_by !== 'Automated Patrol Dispatch' && (
                             <span className="text-[10px] font-extrabold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">
                               🛡️ Assigned by Admin
                             </span>
@@ -496,6 +541,19 @@ export default function UserTasksPage() {
                           {todo.description}
                         </p>
                       )}
+
+                      {!isDone &&
+                        (todo.assigned_by === 'Automated Patrol Dispatch' ||
+                          todo.title.includes('📍 Checkpoint')) && (
+                          <Link
+                            href="/app/scan"
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-2 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                            <span>Scan Physical Checkpoint QR</span>
+                          </Link>
+                        )}
 
                       {/* Admin Verification Pill / Notes */}
                       <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">

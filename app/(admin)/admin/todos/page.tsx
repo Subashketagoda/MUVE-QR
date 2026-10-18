@@ -362,7 +362,7 @@ export default function AdminTodosPage() {
             <span>Assign New Task</span>
           </button>
           <button
-            onClick={fetchTodos}
+            onClick={() => fetchTodos()}
             className="btn btn-secondary btn-sm flex items-center gap-1.5"
             title="Refresh tasks"
           >
@@ -838,7 +838,7 @@ export default function AdminTodosPage() {
                   type="button"
                   onClick={() => {
                     handleToggleAdminReview(selectedTodo)
-                    setSelectedTodo((prev) =>
+                    setSelectedTodo((prev: any) =>
                       prev
                         ? {
                             ...prev,

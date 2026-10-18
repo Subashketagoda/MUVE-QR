@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { INITIAL_QR_CODES, INITIAL_SCANS, INITIAL_SETTINGS, INITIAL_USERS, INITIAL_NOTIFICATIONS } from '@/lib/demo-store'
 import { QRCodeRow, ScanLogRow, ScanStatus } from '@/types/database'
 import { nanoid } from 'nanoid'
+import { getAllTodosFromStore, updateTodoInStore } from '@/lib/todos-store'
 
 function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371e3
@@ -318,6 +319,35 @@ export async function POST(req: NextRequest) {
         is_read: false,
         created_at: scanTimestamp,
       })
+    }
+
+    // Auto-complete any matching pending patrol tasks for this user & checkpoint
+    try {
+      const existingTodos = await getAllTodosFromStore()
+      const matchingPendingTasks = existingTodos.filter(
+        (t) =>
+          t.status === 'pending' &&
+          (t.user_id === finalUserId ||
+            t.user_id === 'all' ||
+            ((finalUserId === 'usr_user_001' || finalUserId === '00000000-0000-0000-0000-000000000002') &&
+              (t.user_id === 'usr_user_001' || t.user_id === '00000000-0000-0000-0000-000000000002'))) &&
+          (t.admin_notes?.includes(qr.token) ||
+            t.title?.toLowerCase().includes(qr.name.toLowerCase()) ||
+            t.title?.toLowerCase().includes(qr.location_name.toLowerCase()) ||
+            (t.description && t.description.toLowerCase().includes(qr.location_name.toLowerCase())))
+      )
+
+      for (const pt of matchingPendingTasks) {
+        await updateTodoInStore(pt.id, {
+          status: 'completed',
+          admin_reviewed: true,
+          reviewed_by: 'QR Scan Verified',
+          reviewed_at: scanTimestamp,
+          admin_notes: `Completed via scan at ${scanTimestamp}. Token: ${qr.token}`,
+        })
+      }
+    } catch (taskErr) {
+      console.warn('[ScanAPI] Error auto-completing matching patrol task:', taskErr)
     }
 
     return NextResponse.json({

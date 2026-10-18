@@ -109,12 +109,16 @@ export let INITIAL_AUDIT_LOGS: AuditLogRow[] = [
 
 export let INITIAL_SETTINGS: AppSettings = {
   org_name: 'MUVE QR Corp',
-  timezone: 'UTC',
+  timezone: 'Asia/Colombo',
   date_format: 'DD/MM/YYYY',
   duplicate_scan_cooldown: '5',
   gps_verification_enabled: 'false',
   notification_sound_enabled: 'true',
   logo_url: '',
+  shift_start_time: '08:00',
+  shift_end_time: '20:00',
+  scans_per_hour: '4',
+  random_patrol_enabled: 'true',
 }
 
 export let INITIAL_TODOS: TodoRow[] = [

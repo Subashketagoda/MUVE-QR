@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState, useCallback, useRef } from 'react'
-import { Bell, BellRing, Volume2, ShieldAlert, CheckCircle2, X, MapPin, User, ArrowRight, AlertTriangle } from 'lucide-react'
+import { Bell, BellRing, Volume2, ShieldAlert, CheckCircle2, X, MapPin, User, ArrowRight, AlertTriangle, QrCode } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase/client'
 
@@ -82,7 +82,7 @@ export function LockScreenNotificationManager() {
           renotify: true,
           requireInteraction: true, // Remains on Lock Screen until staff member interacts!
           data: { url },
-        })
+        } as any)
       } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
         // Fallback: window Notification
         try {
@@ -356,30 +356,60 @@ export function LockScreenNotificationManager() {
       window.addEventListener('muve-trigger-alert-popup', onCustomAlert)
     }
 
+    // Periodic patrol check according to office shift rules (every 45s)
+    const patrolInterval = setInterval(async () => {
+      try {
+        const currentId = getCurrentUserId()
+        await fetch(`/api/patrol/dispatch?userId=${currentId}`, { method: 'POST', cache: 'no-store' })
+      } catch (e) {}
+    }, 45000)
+
+    // Trigger immediate check on mount (after 3s)
+    const initialPatrolTimer = setTimeout(async () => {
+      try {
+        const currentId = getCurrentUserId()
+        await fetch(`/api/patrol/dispatch?userId=${currentId}`, { method: 'POST', cache: 'no-store' })
+      } catch (e) {}
+    }, 3000)
+
     return () => {
       clearInterval(pollInterval)
+      clearInterval(patrolInterval)
+      clearTimeout(initialPatrolTimer)
       if (channel) supabase.removeChannel(channel)
       if (bc) bc.close()
       if (typeof window !== 'undefined') {
         window.removeEventListener('muve-trigger-alert-popup', onCustomAlert)
       }
     }
-  }, [handleNewAlert, saveSeenIds])
+  }, [handleNewAlert, saveSeenIds, getCurrentUserId])
 
   // Helper to parse title and message details
   const parsedReport = incomingAlert
     ? (() => {
+        const isCheckpoint =
+          incomingAlert.title?.includes('Checkpoint') ||
+          incomingAlert.title?.includes('📍') ||
+          incomingAlert.title?.includes('Patrol')
         const isTask =
+          isCheckpoint ||
           incomingAlert.type === 'task' ||
           incomingAlert.title?.includes('Task') ||
           incomingAlert.title?.includes('📋')
         const isReport =
-          incomingAlert.title?.includes('Report') || incomingAlert.title?.includes('🚨')
+          !isCheckpoint &&
+          (incomingAlert.title?.includes('Report') || incomingAlert.title?.includes('🚨'))
 
-        let category = isTask ? 'TASK DISPATCH' : isReport ? 'INCIDENT REPORT' : 'NOTIFICATION'
+        let category = isCheckpoint
+          ? 'CHECKPOINT PATROL'
+          : isTask
+          ? 'TASK DISPATCH'
+          : isReport
+          ? 'INCIDENT REPORT'
+          : 'NOTIFICATION'
         let location = incomingAlert.title || 'MUVE Security System'
         let details = incomingAlert.message || ''
-        let reporter = isReport ? 'Public Visitor' : 'System Admin'
+        let reporter = isCheckpoint ? 'Automated Patrol' : isReport ? 'Public Visitor' : 'System Admin'
         let priority = 'HIGH'
 
         if (incomingAlert.title) {
@@ -391,6 +421,7 @@ export function LockScreenNotificationManager() {
             location = incomingAlert.title
               .replace(/^🚨\s*(?:Public Report:\s*)?/, '')
               .replace(/^📋\s*(?:Task:\s*)?/, '')
+              .replace(/^📍\s*(?:Checkpoint:\s*)?/, '')
           }
         }
 
@@ -404,6 +435,7 @@ export function LockScreenNotificationManager() {
         }
 
         return {
+          isCheckpoint,
           isTask,
           isReport,
           category,
@@ -487,35 +519,46 @@ export function LockScreenNotificationManager() {
 
               {/* Action Buttons */}
               <div className="space-y-2">
-                <button
-                  onClick={async () => {
-                    const alertId = incomingAlert.id
-                    try {
-                      await fetch('/api/todos', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          id: alertId,
-                          title: incomingAlert.title,
-                          status: 'completed',
-                        }),
-                      })
-                      toast.success('Incident marked as resolved & completed!')
-                      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-                        const bc = new BroadcastChannel('muve_todos_bus')
-                        bc.postMessage({ type: 'TODO_UPDATED' })
-                        bc.close()
+                {parsedReport.isCheckpoint ? (
+                  <a
+                    href="/app/scan"
+                    onClick={() => setIncomingAlert(null)}
+                    className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-indigo-500 via-blue-500 to-indigo-600 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 hover:brightness-105 active:scale-[0.98] transition cursor-pointer"
+                  >
+                    <QrCode className="w-4 h-4 stroke-[2.5]" />
+                    <span>Scan Checkpoint Now</span>
+                  </a>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      const alertId = incomingAlert.id
+                      try {
+                        await fetch('/api/todos', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            id: alertId,
+                            title: incomingAlert.title,
+                            status: 'completed',
+                          }),
+                        })
+                        toast.success('Incident marked as resolved & completed!')
+                        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+                          const bc = new BroadcastChannel('muve_todos_bus')
+                          bc.postMessage({ type: 'TODO_UPDATED' })
+                          bc.close()
+                        }
+                      } catch (e) {
+                        console.warn('Error resolving alert:', e)
                       }
-                    } catch (e) {
-                      console.warn('Error resolving alert:', e)
-                    }
-                    setIncomingAlert(null)
-                  }}
-                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 hover:brightness-105 active:scale-[0.98] transition cursor-pointer"
-                >
-                  <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-                  <span>Mark as Resolved & Complete</span>
-                </button>
+                      setIncomingAlert(null)
+                    }}
+                    className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 hover:brightness-105 active:scale-[0.98] transition cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                    <span>Mark as Resolved & Complete</span>
+                  </button>
+                )}
 
                 <a
                   href="/app/tasks"

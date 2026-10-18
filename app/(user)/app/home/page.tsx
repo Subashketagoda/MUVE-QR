@@ -428,6 +428,33 @@ export default function UserHomePage() {
           </button>
         </div>
 
+        {/* Pending Checkpoint Patrol Banner */}
+        {todos.some((t) => t.status === 'pending' && (t.assigned_by === 'Automated Patrol Dispatch' || t.title.includes('📍 Checkpoint'))) && (
+          <div className="bg-gradient-to-r from-indigo-900 via-[#0C1B33] to-slate-900 text-white p-3.5 rounded-2xl border border-indigo-500/40 shadow-lg flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-4 h-4 animate-bounce text-indigo-300" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-black tracking-tight text-white truncate">Pending Checkpoint Scan</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping flex-shrink-0" />
+                </div>
+                <p className="text-[10px] text-slate-300 truncate">
+                  {todos.find((t) => t.status === 'pending' && (t.assigned_by === 'Automated Patrol Dispatch' || t.title.includes('📍 Checkpoint')))?.title.replace(/^📍\s*(?:Checkpoint:\s*)?/, '') || 'Office checkpoint awaiting scan'}
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/app/scan"
+              className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-[11px] font-black rounded-xl border border-indigo-400/30 transition cursor-pointer flex-shrink-0 active:scale-95 flex items-center gap-1 shadow-md shadow-indigo-500/20"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span>Scan Now</span>
+            </Link>
+          </div>
+        )}
+
         {/* User Daily Checklist / To-Do Card */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3">
           <div className="flex items-center justify-between">

@@ -189,16 +189,6 @@ export interface Database {
           updated_at?: string
         }
       }
-    }
-    Views: {
-      scan_stats: {
-        Row: {
-          scans_today: number | null
-          scans_this_week: number | null
-          scans_this_month: number | null
-          total_scans: number | null
-        }
-      }
       todos: {
         Row: {
           id: string
@@ -209,7 +199,7 @@ export interface Database {
           description: string | null
           priority: TodoPriority
           status: TodoStatus
-          assigned_by: string | null
+          assigned_by?: string | null
           admin_reviewed: boolean
           admin_notes: string | null
           reviewed_by: string | null
@@ -245,6 +235,16 @@ export interface Database {
           reviewed_by?: string | null
           reviewed_at?: string | null
           updated_at?: string
+        }
+      }
+    }
+    Views: {
+      scan_stats: {
+        Row: {
+          scans_today: number | null
+          scans_this_week: number | null
+          scans_this_month: number | null
+          total_scans: number | null
         }
       }
     }
@@ -318,4 +318,8 @@ export interface AppSettings {
   gps_verification_enabled: string
   notification_sound_enabled: string
   logo_url: string
+  shift_start_time?: string
+  shift_end_time?: string
+  scans_per_hour?: string
+  random_patrol_enabled?: string
 }
