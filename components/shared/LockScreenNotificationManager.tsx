@@ -71,25 +71,48 @@ export function LockScreenNotificationManager() {
       playAlertSound()
       vibratePhone()
 
-      // Primary: Service Worker showNotification (Appears on Mobile Lock Screen & Desktop Notification Center)
-      if (swReg && 'showNotification' in swReg) {
-        swReg.showNotification(title, {
+      // Primary path A: Ask service worker to showNotification directly (works on locked screen)
+      // Use navigator.serviceWorker.controller.postMessage — avoids the waitUntil issue
+      if (typeof navigator !== 'undefined' && navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SHOW_LOCKSCREEN_NOTIFICATION',
+          title,
           body: message,
-          icon: '/icons/icon-192.png',
-          badge: '/icons/icon-192.png',
-          vibrate: [400, 200, 400, 200, 600],
-          tag: tag,
-          renotify: true,
-          requireInteraction: true, // Remains on Lock Screen until staff member interacts!
+          tag,
+          url,
           data: { url },
-        } as any)
-      } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        // Fallback: window Notification
+        })
+      }
+
+      // Primary path B: SW registration showNotification directly
+      if (swReg && 'showNotification' in swReg) {
+        swReg
+          .showNotification(title, {
+            body: message,
+            icon: '/muve-logo.jpg',
+            badge: '/muve-logo.jpg',
+            vibrate: [300, 150, 300, 150, 600],
+            tag,
+            renotify: true,
+            requireInteraction: true,
+            silent: false,
+            data: { url },
+          } as any)
+          .catch(() => {})
+      }
+
+      // Fallback: browser Notification API (no lock screen, but always visible)
+      if (
+        !swReg &&
+        typeof window !== 'undefined' &&
+        'Notification' in window &&
+        Notification.permission === 'granted'
+      ) {
         try {
           new Notification(title, {
             body: message,
-            icon: '/icons/icon-192.png',
-            tag: tag,
+            icon: '/muve-logo.jpg',
+            tag,
           })
         } catch (e) {}
       }
@@ -172,8 +195,24 @@ export function LockScreenNotificationManager() {
     // Register Service Worker and await ready state
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
-        .register('/sw.js')
-        .then(() => navigator.serviceWorker.ready)
+        .register('/sw.js', { updateViaCache: 'none' })
+        .then((reg) => {
+          // Force the new SW to activate immediately if waiting
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+          }
+          reg.addEventListener('updatefound', () => {
+            const newSW = reg.installing
+            if (newSW) {
+              newSW.addEventListener('statechange', () => {
+                if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+                  newSW.postMessage({ type: 'SKIP_WAITING' })
+                }
+              })
+            }
+          })
+          return navigator.serviceWorker.ready
+        })
         .then((reg) => {
           setSwReg(reg)
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
@@ -184,7 +223,30 @@ export function LockScreenNotificationManager() {
           console.warn('Service worker registration error:', err)
         })
     }
-  }, [subscribeToPush])
+
+    // Listen for PUSH_NOTIFICATION_RECEIVED from the service worker
+    const onSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'PUSH_NOTIFICATION_RECEIVED' && event.data.payload) {
+        const p = event.data.payload
+        const alert = {
+          id: p.tag || `sw-push-${Date.now()}`,
+          title: p.title,
+          message: p.body,
+          created_at: new Date().toISOString(),
+          is_read: false,
+        }
+        // Play sound and show modal popup (notification already shown as lock screen by SW)
+        playAlertSound()
+        vibratePhone()
+        setIncomingAlert(alert)
+      }
+    }
+    navigator.serviceWorker?.addEventListener('message', onSwMessage)
+
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', onSwMessage)
+    }
+  }, [subscribeToPush, playAlertSound, vibratePhone])
 
   // 6. User 1-Tap Enable Action
   const enableLockScreenAlerts = async () => {
@@ -303,25 +365,32 @@ export function LockScreenNotificationManager() {
     } catch (e) {}
 
     // Polling fallback to ensure zero missed notifications
+    const RECENT_THRESHOLD_MS = 30 * 1000 // 30 seconds — seed only older ones
     const pollInterval = setInterval(async () => {
       try {
         const res = await fetch(`/api/notifications?t=${Date.now()}`, { cache: 'no-store' })
         const json = await res.json()
         if (json.success && Array.isArray(json.notifications)) {
-          // On first load/mount after login: seed all existing notifications so past ones never trigger popups!
+          // On first load: mark OLD notifications as seen so they don't popup retroactively.
+          // BUT leave recent ones (< 30s old) unblocked so they still fire.
           if (isInitialLoadRef.current) {
             isInitialLoadRef.current = false
+            const now = Date.now()
             for (const n of json.notifications) {
               const id = n.id || n.title
-              seenAlertIdsRef.current.add(id)
+              const age = n.created_at ? now - new Date(n.created_at).getTime() : Infinity
+              // Only pre-seed if notification is older than 30 seconds
+              if (age > RECENT_THRESHOLD_MS) {
+                seenAlertIdsRef.current.add(id)
+              }
             }
             saveSeenIds()
-            return
+            // Don't return — still process any recent ones below
           }
 
-          // Check only unread and non-scan notifications
+          // Process unread non-scan notifications
           const unreadAlerts = json.notifications
-            .slice(0, 10)
+            .slice(0, 15)
             .filter((n: any) => n.type !== 'scan' && !n.is_read)
 
           for (const alert of unreadAlerts) {

@@ -1,64 +1,77 @@
 // MUVE QR Enterprise Facility Service Worker
-// Enables Native Lock-Screen Notifications, Push Alerts, and Device Vibration
+// v3 — Reliable lock-screen notifications, audio alerts, and cross-tab broadcasting
 
-self.addEventListener('install', (event) => {
+const CACHE_VERSION = 'muve-sw-v3'
+
+self.addEventListener('install', () => {
+  // Immediately take over — don't wait for old SW to idle
   self.skipWaiting()
 })
 
 self.addEventListener('activate', (event) => {
+  // Claim all open clients immediately so push events are handled right away
   event.waitUntil(self.clients.claim())
 })
 
-// 1. Handle Web Push from backend (even when phone is locked or browser is closed)
+// ─── 1. PUSH EVENT ─────────────────────────────────────────────────────────
+// Fires when the backend sends a Web Push — even when phone is locked or browser closed
 self.addEventListener('push', (event) => {
   let payload = {
-    title: '🚨 MUVE Facility Incident Alert',
-    body: 'A new checkpoint issue report has been submitted.',
+    title: '🚨 MUVE Facility Alert',
+    body: 'New activity requires your attention.',
     url: '/app/tasks',
-    tag: 'muve-report-alert',
+    tag: `muve-alert-${Date.now()}`,
   }
 
   if (event.data) {
     try {
       const json = event.data.json()
       payload = { ...payload, ...json }
-    } catch (e) {
-      payload.body = event.data.text()
+    } catch {
+      try { payload.body = event.data.text() } catch {}
     }
   }
 
-  const options = {
+  const notifOptions = {
     body: payload.body,
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
-    vibrate: [400, 200, 400, 200, 600],
-    tag: payload.tag || `muve-alert-${Date.now()}`,
+    icon: '/muve-logo.jpg',
+    badge: '/muve-logo.jpg',
+    vibrate: [300, 150, 300, 150, 600],
+    tag: payload.tag,
     renotify: true,
-    requireInteraction: true, // Forces notification to stay on lock screen until acted on
+    requireInteraction: true,
+    silent: false,
     data: {
       url: payload.url || '/app/tasks',
+      payload,
       dateOfArrival: Date.now(),
     },
     actions: [
-      { action: 'view', title: '🚨 View Task' },
+      { action: 'open', title: '👁 View Now' },
       { action: 'dismiss', title: 'Dismiss' },
     ],
   }
 
-  // Broadcast to open client tabs so in-app modal popup opens simultaneously
-  self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-    clients.forEach((client) => {
-      client.postMessage({
-        type: 'PUSH_NOTIFICATION_RECEIVED',
-        payload,
-      })
+  // Show the native lock-screen notification FIRST, then broadcast to open tabs
+  event.waitUntil(
+    self.registration.showNotification(payload.title, notifOptions).then(() => {
+      // After notification is shown, broadcast to all open client windows
+      // so the in-app modal popup appears too
+      return self.clients
+        .matchAll({ type: 'window', includeUncontrolled: true })
+        .then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({
+              type: 'PUSH_NOTIFICATION_RECEIVED',
+              payload,
+            })
+          })
+        })
     })
-  })
-
-  event.waitUntil(self.registration.showNotification(payload.title, options))
+  )
 })
 
-// 2. Handle Lock Screen Notification Click
+// ─── 2. NOTIFICATION CLICK ─────────────────────────────────────────────────
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
@@ -67,41 +80,54 @@ self.addEventListener('notificationclick', (event) => {
   const targetUrl = event.notification.data?.url || '/app/tasks'
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If a window is already open, focus it and navigate
-      for (const client of clientList) {
-        if ('focus' in client) {
-          client.navigate(targetUrl)
-          return client.focus()
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // Focus an existing window and navigate it
+        for (const client of clientList) {
+          if ('focus' in client) {
+            client.navigate(targetUrl)
+            return client.focus()
+          }
         }
-      }
-      // If no window is open, open a new window to the tasks page
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(targetUrl)
-      }
-    })
+        // No window open — open a new one
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(targetUrl)
+        }
+      })
   )
 })
 
-// 3. Handle messages from client tabs (for direct lock-screen display)
+// ─── 3. MESSAGE FROM CLIENT TAB ────────────────────────────────────────────
+// Clients can ask the SW to show a notification directly (when app is open)
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SHOW_LOCKSCREEN_NOTIFICATION') {
-    const { title, body, tag, data } = event.data
+  if (!event.data) return
+
+  if (event.data.type === 'SHOW_LOCKSCREEN_NOTIFICATION') {
+    const { title, body, tag, url, data } = event.data
+
     const options = {
-      body: body || 'New report alert',
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
-      vibrate: [400, 200, 400, 200, 600],
+      body: body || 'New alert',
+      icon: '/muve-logo.jpg',
+      badge: '/muve-logo.jpg',
+      vibrate: [300, 150, 300, 150, 600],
       tag: tag || `muve-lock-${Date.now()}`,
       renotify: true,
       requireInteraction: true,
-      data: data || { url: '/app/tasks' },
+      silent: false,
+      data: data || { url: url || '/app/tasks' },
       actions: [
-        { action: 'view', title: '🚨 View Task' },
+        { action: 'open', title: '👁 View Now' },
         { action: 'dismiss', title: 'Dismiss' },
       ],
     }
 
-    event.waitUntil(self.registration.showNotification(title || '🚨 Facility Alert', options))
+    // NOTE: message handler does NOT support event.waitUntil in all browsers.
+    // We use a workaround: grab the SW registration directly.
+    self.registration.showNotification(title || '🚨 MUVE Alert', options).catch(() => {})
+  }
+
+  if (event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting()
   }
 })
