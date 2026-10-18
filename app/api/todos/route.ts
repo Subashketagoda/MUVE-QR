@@ -44,8 +44,43 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Fallback to in-memory store
+    // Fallback to in-memory store merged with persisted Supabase notification alerts
     let filtered = [...INITIAL_TODOS]
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data: alerts } = await (supabaseAdmin as any)
+          .from('notifications')
+          .select('*')
+          .eq('type', 'alert')
+          .order('created_at', { ascending: false })
+
+        if (Array.isArray(alerts)) {
+          for (const a of alerts) {
+            const exists = filtered.some((t) => t.id === a.id || t.title === a.title)
+            if (!exists) {
+              filtered.unshift({
+                id: a.id,
+                user_id: 'all',
+                user_name: 'Public Visitor',
+                user_phone: 'Public Checkpoint Scan',
+                title: a.title,
+                description: a.message,
+                priority: 'high',
+                status: a.is_read ? 'completed' : 'pending',
+                assigned_by: 'Public Checkpoint Scan',
+                admin_reviewed: a.is_read,
+                admin_notes: null,
+                reviewed_by: null,
+                reviewed_at: null,
+                created_at: a.created_at,
+                updated_at: a.created_at,
+              })
+            }
+          }
+        }
+      } catch (e) {}
+    }
 
     if (userId) {
       // Normalize comparison for demo user IDs and broadcast 'all'
