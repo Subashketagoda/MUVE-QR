@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Logo } from '@/components/shared/Logo'
 import {
@@ -44,6 +44,11 @@ export default function UserHomePage() {
   const [loading, setLoading] = useState(true)
   const [sosActive, setSosActive] = useState(false)
   const [sosGps, setSosGps] = useState<{ lat: number; lng: number } | null>(null)
+  const [isHoldingSos, setIsHoldingSos] = useState(false)
+  const [sosHoldProgress, setSosHoldProgress] = useState(0)
+  const [holdSecondsLeft, setHoldSecondsLeft] = useState(5)
+  const holdIntervalRef = useRef<any>(null)
+  const holdStartRef = useRef<number>(0)
 
   useEffect(() => {
     // Read logged in user from localStorage
@@ -344,6 +349,61 @@ export default function UserHomePage() {
   }
 
   // -------------------------------------------------------------
+  // 🛡️ 5-SECOND SAFETY HOLD LOGIC (PREVENTS ACCIDENTAL PRESSES)
+  // -------------------------------------------------------------
+  const startSosHold = (e: React.SyntheticEvent) => {
+    e.preventDefault()
+    setIsHoldingSos(true)
+    setSosHoldProgress(0)
+    setHoldSecondsLeft(5)
+    holdStartRef.current = Date.now()
+
+    if ('vibrate' in navigator) {
+      navigator.vibrate(60)
+    }
+
+    if (holdIntervalRef.current) clearInterval(holdIntervalRef.current)
+
+    holdIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - holdStartRef.current
+      const progress = Math.min((elapsed / 5000) * 100, 100)
+      const remainingSec = Math.max(Math.ceil((5000 - elapsed) / 1000), 0)
+
+      setSosHoldProgress(progress)
+      setHoldSecondsLeft(remainingSec)
+
+      // Light haptic tick on each countdown second
+      if (remainingSec < 5 && remainingSec > 0 && Math.floor(elapsed / 1000) !== Math.floor((elapsed - 50) / 1000)) {
+        if ('vibrate' in navigator) navigator.vibrate(80)
+      }
+
+      if (elapsed >= 5000) {
+        clearInterval(holdIntervalRef.current)
+        holdIntervalRef.current = null
+        setIsHoldingSos(false)
+        setSosHoldProgress(0)
+        handleTriggerSOS()
+      }
+    }, 40)
+  }
+
+  const cancelSosHold = () => {
+    if (holdIntervalRef.current) {
+      clearInterval(holdIntervalRef.current)
+      holdIntervalRef.current = null
+    }
+    if (isHoldingSos) {
+      const elapsed = Date.now() - holdStartRef.current
+      setIsHoldingSos(false)
+      if (elapsed > 400 && elapsed < 4800) {
+        toast.info('SOS Cancelled. Hold firmly for full 5 seconds to activate.', { duration: 3000 })
+      }
+      setSosHoldProgress(0)
+      setHoldSecondsLeft(5)
+    }
+  }
+
+  // -------------------------------------------------------------
   // Calculate Next Pending Checkpoint & Tour Progress
   // -------------------------------------------------------------
   const pendingTodo = todos.find(
@@ -415,16 +475,51 @@ export default function UserHomePage() {
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span>Live Ready</span>
               </div>
-              {/* 🚨 SOS BUTTON */}
-              <button
-                type="button"
-                onClick={handleTriggerSOS}
-                className="px-3 py-1 rounded-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_18px_rgba(225,29,72,0.85)] border border-rose-300 animate-pulse active:scale-90 transition cursor-pointer"
-                title="Emergency SOS Alarm"
-              >
-                <ShieldAlert className="w-3.5 h-3.5" />
-                <span>SOS</span>
-              </button>
+              {/* 🚨 5-SEC HOLD SOS BUTTON */}
+              <div className="relative select-none">
+                <button
+                  type="button"
+                  onPointerDown={startSosHold}
+                  onPointerUp={cancelSosHold}
+                  onPointerLeave={cancelSosHold}
+                  onTouchStart={startSosHold}
+                  onTouchEnd={cancelSosHold}
+                  onTouchCancel={cancelSosHold}
+                  onMouseDown={startSosHold}
+                  onMouseUp={cancelSosHold}
+                  onMouseLeave={cancelSosHold}
+                  onContextMenu={(e) => e.preventDefault()}
+                  className={`relative overflow-hidden px-3.5 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 border transition-all cursor-pointer select-none ${
+                    isHoldingSos
+                      ? 'bg-red-700 text-white border-white scale-105 shadow-[0_0_25px_rgba(239,68,68,1)] ring-2 ring-white'
+                      : 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white border-rose-300 shadow-[0_0_16px_rgba(225,29,72,0.7)] animate-pulse'
+                  }`}
+                  style={{ touchAction: 'none' }}
+                  title="Hold for 5 seconds to activate Emergency SOS"
+                >
+                  {/* Visual 5-Second Fill Bar */}
+                  <div
+                    className="absolute inset-0 bg-white/40 pointer-events-none transition-all duration-75"
+                    style={{ width: `${sosHoldProgress}%` }}
+                  />
+
+                  <ShieldAlert
+                    className={`w-3.5 h-3.5 relative z-10 ${
+                      isHoldingSos ? 'animate-bounce text-white' : ''
+                    }`}
+                  />
+                  <span className="relative z-10 whitespace-nowrap">
+                    {isHoldingSos ? `HOLD ${holdSecondsLeft}s` : 'HOLD SOS (5s)'}
+                  </span>
+                </button>
+
+                {/* Floating Tooltip Pill during Hold */}
+                {isHoldingSos && (
+                  <div className="absolute -bottom-8 right-0 bg-black/95 text-white text-[10px] font-black px-2.5 py-0.5 rounded-lg border border-red-500 shadow-xl whitespace-nowrap z-30 animate-in fade-in">
+                    Hold for 5s: {holdSecondsLeft}s left...
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
