@@ -17,6 +17,7 @@ import {
   CheckSquare,
   TrendingUp,
   Trophy,
+  AlertTriangle,
 } from 'lucide-react'
 
 interface AdminSidebarProps {
@@ -29,6 +30,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, setMobil
 
   const navItems = [
     { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/admin/incidents', label: 'Incidents & Hazards', icon: AlertTriangle, badge: 'NEW' },
     { href: '/admin/performance', label: 'Staff Patrol Leaderboard', icon: Trophy, badge: 'TV' },
     { href: '/admin/live-scans', label: 'Live Scans', icon: Radio, badge: 'LIVE' },
     { href: '/admin/todos', label: 'Tasks & Checklist', icon: CheckSquare },

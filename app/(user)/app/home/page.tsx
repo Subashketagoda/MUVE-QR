@@ -22,6 +22,7 @@ import {
   Plus,
   Bell,
   BellRing,
+  ShieldAlert,
 } from 'lucide-react'
 import { TodoRow } from '@/types/database'
 import { toast } from 'sonner'
@@ -32,6 +33,7 @@ export default function UserHomePage() {
   const [lastScan, setLastScan] = useState<any>(null)
   const [recentScans, setRecentScans] = useState<any[]>([])
   const [todos, setTodos] = useState<TodoRow[]>([])
+  const [checkpoints, setCheckpoints] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -51,6 +53,7 @@ export default function UserHomePage() {
     setUser(currentUsr)
     fetchUserScans(currentUsr.id)
     fetchUserTodos(currentUsr.id)
+    fetchCheckpoints()
 
     // BroadcastChannel sync across tabs
     let bc: BroadcastChannel | null = null
@@ -59,6 +62,7 @@ export default function UserHomePage() {
         bc = new BroadcastChannel('muve_todos_bus')
         bc.onmessage = () => {
           fetchUserTodos(currentUsr.id)
+          fetchCheckpoints()
         }
       }
     } catch (e) {}
@@ -68,7 +72,10 @@ export default function UserHomePage() {
       fetchUserTodos(currentUsr.id)
     }, 3000)
 
-    const onFocus = () => fetchUserTodos(currentUsr.id)
+    const onFocus = () => {
+      fetchUserTodos(currentUsr.id)
+      fetchCheckpoints()
+    }
     window.addEventListener('focus', onFocus)
 
     return () => {
@@ -77,6 +84,18 @@ export default function UserHomePage() {
       window.removeEventListener('focus', onFocus)
     }
   }, [])
+
+  const fetchCheckpoints = async () => {
+    try {
+      const res = await fetch('/api/qr-codes', { cache: 'no-store' })
+      const data = await res.json()
+      if (data.success && Array.isArray(data.qrCodes)) {
+        setCheckpoints(data.qrCodes.filter((q: any) => q.status === 'active'))
+      }
+    } catch (e) {
+      console.warn('Error fetching checkpoints:', e)
+    }
+  }
 
   const fetchUserTodos = async (userId: string) => {
     try {
@@ -255,6 +274,58 @@ export default function UserHomePage() {
     }, 3000)
   }
 
+  // -------------------------------------------------------------
+  // Calculate Next Pending Checkpoint & Tour Progress
+  // -------------------------------------------------------------
+  const pendingTodo = todos.find(
+    (t) =>
+      t.status === 'pending' &&
+      (t.assigned_by === 'Automated Patrol Dispatch' ||
+        t.title.includes('📍 Checkpoint') ||
+        t.title.includes('Checkpoint:'))
+  )
+
+  const todayScannedLocations = new Set(
+    recentScans
+      .filter((s) => {
+        const d = new Date(s.scanned_at)
+        const now = new Date()
+        return (
+          d.getDate() === now.getDate() &&
+          d.getMonth() === now.getMonth() &&
+          d.getFullYear() === now.getFullYear()
+        )
+      })
+      .map((s) => (s.location_name || s.qr_name || '').toLowerCase().trim())
+  )
+
+  const unscannedCatalogPoints = checkpoints.filter(
+    (cp) =>
+      !todayScannedLocations.has((cp.location_name || cp.name || '').toLowerCase().trim())
+  )
+
+  const nextPendingPoint = pendingTodo
+    ? {
+        id: pendingTodo.id,
+        location_name: pendingTodo.title.replace(/^📍\s*(?:Checkpoint:\s*)?/, ''),
+        name: pendingTodo.title.replace(/^📍\s*(?:Checkpoint:\s*)?/, ''),
+        description: pendingTodo.description || 'Assigned patrol inspection checkpoint',
+        isTodo: true,
+      }
+    : unscannedCatalogPoints.length > 0
+    ? unscannedCatalogPoints[0]
+    : null
+
+  const totalCheckpoints = Math.max(checkpoints.length, 1)
+  const scannedCountToday = Math.min(scansToday, totalCheckpoints)
+  const progressPct = Math.round((scannedCountToday / totalCheckpoints) * 100)
+  const otherPendingCount = Math.max(
+    (pendingTodo
+      ? todos.filter((t) => t.status === 'pending').length - 1
+      : unscannedCatalogPoints.length - 1),
+    0
+  )
+
   return (
     <div className="space-y-5 pb-6">
       {/* Premium Hero Header with Mobile Status Bar Safe Area */}
@@ -299,35 +370,147 @@ export default function UserHomePage() {
       </div>
 
       <div className="px-4 space-y-5">
-        {/* Primary Giant SCAN QR CODE Hero Card */}
-        <Link
-          href="/app/scan"
-          className="relative overflow-hidden p-6 rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-xl shadow-blue-600/25 active:scale-[0.98] transition-transform duration-200 block group"
-        >
-          {/* Subtle patterned overlay */}
-          <div className="absolute -right-6 -bottom-6 w-36 h-36 bg-white/10 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform duration-500" />
+        {/* ============================================================ */}
+        {/* 📍 GIANT PROMINENT PENDING SCAN POINT HERO CARD */}
+        {/* ============================================================ */}
+        {nextPendingPoint ? (
+          <div className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-[#0c233c] via-[#091b2e] to-[#05111f] border-2 border-amber-400/80 shadow-[0_15px_45px_rgba(245,158,11,0.28)] text-white p-5 space-y-4">
+            {/* Ambient High-Tech Glow */}
+            <div className="absolute -top-16 -right-16 w-52 h-52 bg-amber-500/25 rounded-full blur-3xl pointer-events-none animate-pulse" />
+            <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-white text-blue-700 flex items-center justify-center shadow-md group-hover:rotate-6 transition-transform">
-                <QrCode className="w-8 h-8" />
+            {/* Top Status Pill & Checkpoint Number */}
+            <div className="relative z-10 flex items-center justify-between">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/60 shadow-sm">
+                <span className="flex h-2.5 w-2.5 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                </span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-amber-300">
+                  ⚡ PENDING CHECKPOINT SCAN
+                </span>
+              </div>
+
+              <span className="text-[11px] font-mono font-extrabold text-amber-200 bg-black/60 px-2.5 py-1 rounded-xl border border-amber-400/30">
+                {scannedCountToday + 1} of {totalCheckpoints}
+              </span>
+            </div>
+
+            {/* Huge Point Title */}
+            <div className="relative z-10 space-y-1 pt-1">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-[#D4FC04] text-slate-950 flex items-center justify-center flex-shrink-0 shadow-lg shadow-amber-400/30 mt-0.5">
+                  <MapPin className="w-7 h-7 stroke-[2.5] animate-bounce" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-extrabold text-amber-300/90 uppercase tracking-widest">
+                    Next Target Location
+                  </p>
+                  <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight break-words">
+                    {nextPendingPoint.location_name || nextPendingPoint.name}
+                  </h2>
+                  {nextPendingPoint.description && (
+                    <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                      {nextPendingPoint.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Tour Progress Gauge */}
+            <div className="relative z-10 space-y-1.5 pt-2 border-t border-white/10">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="text-slate-300 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Patrol Tour Progress</span>
+                </span>
+                <span className="text-amber-300 font-mono font-extrabold">
+                  {scannedCountToday} / {totalCheckpoints} Completed ({progressPct}%)
+                </span>
+              </div>
+              <div className="w-full h-3 bg-black/60 rounded-full overflow-hidden border border-white/15 p-0.5">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-400 via-[#D4FC04] to-emerald-400 rounded-full transition-all duration-500 shadow-md"
+                  style={{ width: `${Math.max(progressPct, 6)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* GIANT SCAN ACTION BUTTON */}
+            <Link
+              href="/app/scan"
+              className="relative z-10 w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#D4FC04] via-amber-300 to-[#D4FC04] text-slate-950 font-black text-base tracking-wide uppercase flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(212,252,4,0.4)] active:scale-95 transition transform group"
+            >
+              <div className="w-8 h-8 rounded-xl bg-slate-950 text-[#D4FC04] flex items-center justify-center group-hover:rotate-12 transition-transform shadow">
+                <QrCode className="w-5 h-5 stroke-[2.5]" />
+              </div>
+              <span className="text-slate-950 font-black tracking-tight text-base sm:text-lg">
+                SCAN THIS CHECKPOINT
+              </span>
+              <ChevronRight className="w-5 h-5 stroke-[3] group-hover:translate-x-1 transition-transform" />
+            </Link>
+
+            {/* Other Pending Checkpoints Queue note */}
+            {otherPendingCount > 0 && (
+              <div className="relative z-10 pt-1 flex items-center justify-between text-[11px] text-slate-300 border-t border-white/10">
+                <span className="text-slate-400">
+                  + {otherPendingCount} more checkpoints in queue
+                </span>
+                <Link href="/app/tasks" className="text-amber-300 hover:underline font-bold flex items-center gap-0.5">
+                  <span>View Tour List</span>
+                  <ChevronRight className="w-3 h-3" />
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-[28px] bg-gradient-to-br from-emerald-950/80 via-slate-900 to-[#072B3B] border border-emerald-500/40 p-5 text-white shadow-xl flex items-center justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center">
+                <CheckCircle2 className="w-7 h-7" />
               </div>
               <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider bg-[#D4FC04] text-black px-1.5 py-0.5 rounded">
-                    Action
-                  </span>
-                  <span className="text-xs font-semibold text-blue-200">Point Scanner</span>
-                </div>
-                <h3 className="text-xl font-black text-white tracking-tight mt-0.5">
-                  SCAN CHECKPOINT
-                </h3>
-                <p className="text-xs text-blue-100/90">Instant QR camera & location logger</p>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">
+                  All Checkpoints Up to Date
+                </span>
+                <h3 className="text-lg font-black text-white">Patrol Route Complete</h3>
+                <p className="text-xs text-slate-300">All registered checkpoints scanned today.</p>
               </div>
             </div>
-            <div className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center group-hover:translate-x-1 transition-transform">
-              <ChevronRight className="w-5 h-5 text-white" />
+            <Link
+              href="/app/scan"
+              className="p-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs"
+            >
+              <QrCode className="w-5 h-5" />
+            </Link>
+          </div>
+        )}
+
+        {/* Report Incident / Hazard Emergency Banner */}
+        <Link
+          href="/app/incidents"
+          className="relative overflow-hidden p-4 rounded-3xl bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 text-white shadow-lg border border-rose-500/30 flex items-center justify-between active:scale-[0.98] transition group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+              <ShieldAlert className="w-6 h-6 animate-pulse" />
             </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider bg-rose-600 text-white px-1.5 py-0.5 rounded">
+                  Hazard
+                </span>
+                <span className="text-xs font-bold text-rose-200">Incident & Damage</span>
+              </div>
+              <h4 className="text-base font-black text-white tracking-tight mt-0.5">
+                REPORT AN INCIDENT
+              </h4>
+              <p className="text-[11px] text-slate-300">Attach live camera photo & GPS location</p>
+            </div>
+          </div>
+          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center group-hover:translate-x-1 transition text-white">
+            <ChevronRight className="w-4 h-4" />
           </div>
         </Link>
 
@@ -427,33 +610,6 @@ export default function UserHomePage() {
             Test Alert
           </button>
         </div>
-
-        {/* Pending Checkpoint Patrol Banner */}
-        {todos.some((t) => t.status === 'pending' && (t.assigned_by === 'Automated Patrol Dispatch' || t.title.includes('📍 Checkpoint'))) && (
-          <div className="bg-gradient-to-r from-indigo-900 via-[#0C1B33] to-slate-900 text-white p-3.5 rounded-2xl border border-indigo-500/40 shadow-lg flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-4 h-4 animate-bounce text-indigo-300" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-black tracking-tight text-white truncate">Pending Checkpoint Scan</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping flex-shrink-0" />
-                </div>
-                <p className="text-[10px] text-slate-300 truncate">
-                  {todos.find((t) => t.status === 'pending' && (t.assigned_by === 'Automated Patrol Dispatch' || t.title.includes('📍 Checkpoint')))?.title.replace(/^📍\s*(?:Checkpoint:\s*)?/, '') || 'Office checkpoint awaiting scan'}
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/app/scan"
-              className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-[11px] font-black rounded-xl border border-indigo-400/30 transition cursor-pointer flex-shrink-0 active:scale-95 flex items-center gap-1 shadow-md shadow-indigo-500/20"
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>Scan Now</span>
-            </Link>
-          </div>
-        )}
 
         {/* User Daily Checklist / To-Do Card */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3">

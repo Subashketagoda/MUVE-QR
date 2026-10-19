@@ -12,6 +12,31 @@ export type NotificationType = 'scan' | 'alert' | 'system' | 'invalid_scan'
 export type TodoPriority = 'low' | 'medium' | 'high' | 'urgent'
 export type TodoStatus = 'pending' | 'in_progress' | 'completed'
 
+export type IncidentCategory = 'security' | 'fire_safety' | 'maintenance' | 'medical' | 'damage' | 'other'
+export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical'
+export type IncidentStatus = 'reported' | 'investigating' | 'resolved' | 'dismissed'
+
+export interface IncidentRow {
+  id: string
+  title: string
+  category: IncidentCategory
+  severity: IncidentSeverity
+  location_name: string
+  description: string
+  photo_url?: string | null
+  reported_by_id: string
+  reported_by_name: string
+  reported_by_phone?: string | null
+  status: IncidentStatus
+  action_taken?: string | null
+  resolved_by?: string | null
+  resolved_at?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Database {
   public: {
     Tables: {
