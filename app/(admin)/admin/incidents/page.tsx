@@ -26,8 +26,10 @@ import {
   X,
   Check,
   Phone,
+  Siren,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { soundEngine } from '@/lib/sounds'
 import { IncidentRow, IncidentStatus, IncidentSeverity } from '@/types/database'
 
 export default function AdminIncidentsPage() {
@@ -50,35 +52,13 @@ export default function AdminIncidentsPage() {
   const latestIncidentIdRef = useRef<string | null>(null)
 
   // Web Audio API Emergency Siren/Beep for critical incidents
+  // Tactical Police/Ambulance SOS Siren for emergency alerts
   const playSirenAlert = useCallback(() => {
     if (!soundEnabled) return
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
-      if (!AudioCtx) return
-      const ctx = new AudioCtx()
-      const now = ctx.currentTime
-
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.type = 'sawtooth'
-
-      // Police/Emergency European 2-tone siren
-      osc.frequency.setValueAtTime(700, now)
-      osc.frequency.setValueAtTime(960, now + 0.2)
-      osc.frequency.setValueAtTime(700, now + 0.4)
-      osc.frequency.setValueAtTime(960, now + 0.6)
-
-      gain.gain.setValueAtTime(0.2, now)
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.9)
-
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-
-      osc.start(now)
-      osc.stop(now + 0.9)
-    } catch (e) {
-      console.warn('Audio error:', e)
-    }
+    const siren = soundEngine.startSOSSiren()
+    setTimeout(() => {
+      siren.stop()
+    }, 4500)
   }, [soundEnabled])
 
   const fetchIncidents = async (isInitial = false) => {
@@ -242,6 +222,24 @@ export default function AdminIncidentsPage() {
           >
             {soundEnabled ? <Volume2 className="w-4 h-4 text-rose-400" /> : <VolumeX className="w-4 h-4" />}
             <span>{soundEnabled ? 'Siren Alert: ON' : 'Siren Muted'}</span>
+          </button>
+
+          {/* Test SOS Siren Button */}
+          <button
+            onClick={() => {
+              if (soundEngine.isPlaying()) {
+                soundEngine.stopSOSSiren()
+                toast.info('Siren stopped')
+              } else {
+                const siren = soundEngine.startSOSSiren()
+                toast.error('🚨 Playing Supiri Tactical SOS Siren...', { duration: 4500 })
+                setTimeout(() => siren.stop(), 4500)
+              }
+            }}
+            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md shadow-rose-600/30 flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+          >
+            <Siren className="w-4 h-4 animate-bounce" />
+            <span>Test SOS Siren</span>
           </button>
 
           {/* Export CSV */}

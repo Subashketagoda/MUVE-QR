@@ -23,9 +23,16 @@ import {
   Bell,
   BellRing,
   ShieldAlert,
+  Volume2,
+  VolumeX,
+  PhoneCall,
+  Siren,
+  Radio,
+  X,
 } from 'lucide-react'
 import { TodoRow } from '@/types/database'
 import { toast } from 'sonner'
+import { soundEngine } from '@/lib/sounds'
 
 export default function UserHomePage() {
   const [user, setUser] = useState<any>(null)
@@ -35,6 +42,8 @@ export default function UserHomePage() {
   const [todos, setTodos] = useState<TodoRow[]>([])
   const [checkpoints, setCheckpoints] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [sosActive, setSosActive] = useState(false)
+  const [sosGps, setSosGps] = useState<{ lat: number; lng: number } | null>(null)
 
   useEffect(() => {
     // Read logged in user from localStorage
@@ -275,6 +284,66 @@ export default function UserHomePage() {
   }
 
   // -------------------------------------------------------------
+  // 🚨 SUPIRI TACTICAL SOS EMERGENCY TRIGGER
+  // -------------------------------------------------------------
+  const handleTriggerSOS = () => {
+    soundEngine.startSOSSiren()
+    setSosActive(true)
+
+    if ('vibrate' in navigator) {
+      navigator.vibrate([600, 150, 600, 150, 800, 200, 1000])
+    }
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = Number(pos.coords.latitude.toFixed(6))
+          const lng = Number(pos.coords.longitude.toFixed(6))
+          setSosGps({ lat, lng })
+          dispatchSOSIncident(lat, lng)
+        },
+        () => {
+          dispatchSOSIncident(null, null)
+        },
+        { enableHighAccuracy: true, timeout: 6000 }
+      )
+    } else {
+      dispatchSOSIncident(null, null)
+    }
+
+    toast.error('🚨 CRITICAL SOS ACTIVATED! EMERGENCY SIREN SOUNDING!', { duration: 6000 })
+  }
+
+  const dispatchSOSIncident = async (lat: number | null, lng: number | null) => {
+    try {
+      await fetch('/api/incidents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `🚨 CRITICAL SOS: Officer Needs Immediate Assistance!`,
+          category: 'security',
+          severity: 'critical',
+          location_name: lastScan?.location_name || 'Field Patrol / On Duty',
+          description: `EMERGENCY SOS PANIC BUTTON TRIGGERED BY ${user?.full_name || 'Guard'} (${user?.phone || 'No phone'}). Immediate backup required!`,
+          reported_by_id: user?.id || 'usr_anonymous',
+          reported_by_name: user?.full_name || 'Staff Officer',
+          reported_by_phone: user?.phone || null,
+          latitude: lat,
+          longitude: lng,
+        }),
+      })
+    } catch (e) {
+      console.warn('Failed to dispatch SOS report:', e)
+    }
+  }
+
+  const handleStopSOS = () => {
+    soundEngine.stopSOSSiren()
+    setSosActive(false)
+    toast.info('SOS Siren Silenced.')
+  }
+
+  // -------------------------------------------------------------
   // Calculate Next Pending Checkpoint & Tour Progress
   // -------------------------------------------------------------
   const pendingTodo = todos.find(
@@ -341,9 +410,21 @@ export default function UserHomePage() {
           {/* Top Bar with Logo and Status */}
           <div className="flex items-center justify-between">
             <Logo size="sm" showSubtitle={true} subtitleText="QR SYSTEM" variant="dark" />
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] font-semibold text-emerald-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Live Ready</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] font-semibold text-emerald-300">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Live Ready</span>
+              </div>
+              {/* 🚨 SOS BUTTON */}
+              <button
+                type="button"
+                onClick={handleTriggerSOS}
+                className="px-3 py-1 rounded-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_18px_rgba(225,29,72,0.85)] border border-rose-300 animate-pulse active:scale-90 transition cursor-pointer"
+                title="Emergency SOS Alarm"
+              >
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span>SOS</span>
+              </button>
             </div>
           </div>
 
@@ -765,6 +846,88 @@ export default function UserHomePage() {
           )}
         </div>
       </div>
+
+      {/* ============================================================ */}
+      {/* 🚨 TACTICAL FULL-SCREEN SOS PANIC OVERLAY */}
+      {/* ============================================================ */}
+      {sosActive && (
+        <div className="fixed inset-0 z-50 bg-gradient-to-b from-rose-950 via-red-950 to-black text-white flex flex-col justify-between p-6 animate-in fade-in duration-200">
+          {/* Strobe background flashing animation */}
+          <div className="absolute inset-0 bg-red-600/15 pointer-events-none animate-pulse" />
+
+          {/* Top Bar */}
+          <div className="relative z-10 flex items-center justify-between pt-4">
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/30 border border-red-400 text-red-200 text-xs font-black uppercase tracking-widest animate-pulse">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-ping" />
+              <span>EMERGENCY SOS ACTIVE</span>
+            </div>
+            <button
+              onClick={handleStopSOS}
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Center Siren Strobe Visualizer */}
+          <div className="relative z-10 flex flex-col items-center text-center space-y-4 my-auto">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full bg-rose-600/40 blur-3xl animate-ping" />
+              <div className="relative w-28 h-28 rounded-full bg-gradient-to-tr from-rose-600 to-red-500 border-4 border-white flex items-center justify-center shadow-[0_0_60px_rgba(225,29,72,0.9)] animate-bounce">
+                <Siren className="w-14 h-14 text-white stroke-[2.5]" />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <h2 className="text-3xl font-black tracking-tight text-white uppercase">
+                POLICE & CONTROL ROOM ALERTED
+              </h2>
+              <p className="text-sm font-bold text-rose-300">
+                Loud Tactical Siren Sounding • GPS Broadcast Live
+              </p>
+            </div>
+
+            {/* Live GPS badge */}
+            <div className="px-4 py-2 rounded-2xl bg-black/60 border border-red-500/40 text-xs font-mono text-rose-200 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-rose-400" />
+              <span>
+                {sosGps
+                  ? `GPS: ${sosGps.lat}° N, ${sosGps.lng}° E (Live Broadcast)`
+                  : 'Acquiring high-precision GPS...'}
+              </span>
+            </div>
+          </div>
+
+          {/* Bottom Actions: Emergency One-Tap Call & Silence */}
+          <div className="relative z-10 space-y-3 pb-6">
+            <div className="grid grid-cols-2 gap-2.5">
+              <a
+                href="tel:119"
+                className="py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase flex items-center justify-center gap-2 shadow-lg"
+              >
+                <PhoneCall className="w-4 h-4" />
+                <span>Call 119 (Police)</span>
+              </a>
+              <a
+                href="tel:1990"
+                className="py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase flex items-center justify-center gap-2 shadow-lg"
+              >
+                <PhoneCall className="w-4 h-4" />
+                <span>Call 1990 (Ambulance)</span>
+              </a>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleStopSOS}
+              className="w-full py-4 rounded-2xl bg-white hover:bg-slate-200 text-black font-black text-base uppercase tracking-wider flex items-center justify-center gap-2 shadow-2xl active:scale-98 transition cursor-pointer"
+            >
+              <VolumeX className="w-5 h-5 text-red-600" />
+              <span>SILENCE SIREN & CANCEL SOS</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
