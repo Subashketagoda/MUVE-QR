@@ -1,6 +1,0 @@
-# Ignore non-web directories to optimize Vercel output deployment
-/android/
-/android-twa/
-/supabase/
-/scripts/
-README.md
