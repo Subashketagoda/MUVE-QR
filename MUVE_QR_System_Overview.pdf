@@ -1,0 +1,853 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 8421
+>>
+stream
+0.5670000000000001 w
+0 G
+0.06 0.09 0.16 rg
+48.1889763779527627 796.5356692913385359 m
+547.0910236220471461 796.5356692913385359 l
+551.7876183450176768 796.5356692913385359 555.5949606299211609 792.7283270064350518 555.5949606299211609 788.0317322834645211 c
+555.5949606299211609 731.3388188976377933 l
+555.5949606299211609 726.6422241746672626 550.8983659069507439 722.8348818897637784 547.0910236220471461 722.8348818897637784 c
+48.1889763779527627 722.8348818897637784 l
+43.492381654982232 722.8348818897637784 39.6850393700787407 727.5314766127341954 39.6850393700787407 731.3388188976377933 c
+39.6850393700787407 788.0317322834645211 l
+39.6850393700787407 792.7283270064350518 44.3816340930492714 796.5356692913385359 48.1889763779527627 796.5356692913385359 c
+h
+f
+BT
+/F2 18 Tf
+20.6999999999999993 TL
+1. g
+62.3622047244094517 765.3545669291338527 Td
+(MUVE QR) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.749 0.859 0.996 rg
+62.3622047244094517 745.5120472440944468 Td
+(Smart Security Patrol & Facility Guard Tour Management System) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.58 0.639 0.722 rg
+328.5977952755904425 765.3545669291338527 Td
+(SYSTEM CAPABILITIES & SPECIFICATION OVERVIEW) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.58 0.639 0.722 rg
+361.1577952755904448 745.5120472440944468 Td
+(FOR MANAGEMENT & OPERATIONS REVIEW) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0.059 0.09 0.165 rg
+39.6850393700787407 700.15771653543311 Td
+(1. Executive Summary) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.2 0.255 0.333 rg
+39.6850393700787407 683.1498425196850803 Td
+(MUVE QR is an enterprise-grade digital guard tour tracking, facility inspection, and emergency dispatch management) Tj
+T* (platform. It replaces outdated paper logbooks and legacy RFID baton hardware with an intelligent, cloud-connected mobile) Tj
+T* (web solution that guarantees real-time guard accountability, incident documentation, and rapid emergency response.) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0.059 0.09 0.165 rg
+39.6850393700787407 629.291574803149615 Td
+(2. Security Guard Mobile Application \(Field Operations\)) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.145 0.388 0.922 rg
+39.6850393700787407 612.2837007874015853 Td
+(A. Next Checkpoint Guidance \(Hero Tour Navigator\)) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 598.1104724409448181 Td
+(• Giant Pending Checkpoint Card: Displays the exact next checkpoint to patrol \(e.g., 01st Floor - Ladies Washroom\),) Tj
+T* (eliminating missed checkpoints.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 572.5986614173227736 Td
+(• Tour Progress Indicator: Live visual gauge \(e.g., 8 / 10 Points Completed\) showing real-time patrol tour completion) Tj
+T* (percentage.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 547.086850393700729 Td
+(• One-Tap Scan Trigger: Prominently placed on the mobile home screen for quick scanning without navigating menus.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.145 0.388 0.922 rg
+39.6850393700787407 525.827007874015635 Td
+(B. High-Speed QR Checkpoint Scanner) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 511.6537795275589815 Td
+(• Built-in Flashlight & Camera Scanner: Rapid QR scanning in dark basements, stairwells, and night patrols.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 498.8978740157479592 Td
+(• Haptic Vibration Feedback: Tactile confirmation on successful scans.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 486.1419685039369369 Td
+(• GPS Geolocation Tagging: Captures exact device coordinates per scan to prevent off-site check-in fraud.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 473.3860629921259147 Td
+(• Anti-Spoof Token Verification: Cryptographically secured QR tokens prevent reproduction from photographs.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.145 0.388 0.922 rg
+39.6850393700787407 452.1262204724408775 Td
+(C. Tactical Emergency SOS & Panic Dispatch System) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 437.952992125984224 Td
+(• 5-Second Safety Hold Activation: Requires holding the SOS button for 5 seconds with a live circular progress countdown to) Tj
+T* (eliminate accidental pocket presses.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 412.4411811023621226 Td
+(• Dual-Tone Tactical Siren Engine: Multi-oscillator emergency alarm \(540Hz - 1180Hz rapid frequency sweep + dissonant alarm) Tj
+T* (+ sub-bass pulses\) engineered via Web Audio API without requiring audio downloads.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 386.929370078740078 Td
+(• Hardware Vibration Engine: Aggressive pulsing vibration alerts nearby personnel in stealth or high-noise situations.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 374.1734645669290558 Td
+(• Live GPS Emergency Broadcast: Coordinates are immediately dispatched to Headquarters and the Admin Operations Center.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 361.4175590551180335 Td
+(• Full-Screen Strobe Alert & Hotlines: Flashing emergency overlay with one-tap calling to 119 \(Police\) and 1990 \(Ambulance\).) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.145 0.388 0.922 rg
+39.6850393700787407 340.1577165354329964 Td
+(D. Mobile Incident & Hazard Reporting) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 325.9844881889763428 Td
+(• Live Camera Evidence Attachment: Guards take photos of broken locks, water leaks, or safety hazards directly from their) Tj
+T* (device.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 300.4726771653542983 Td
+(• Auto Image Compression: Client-side optimization ensures instant upload even on low-speed 3G/4G connections.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 287.7167716535432191 Td
+(• Categorization & Severity: Tagged as Security, Fire Safety, Maintenance, Medical, or Hazard with Low/Medium/High/Critical) Tj
+T* (ratings.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 262.2049606299211746 Td
+(• Guard Incident History: Guards can review previously submitted reports and resolution statuses.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.145 0.388 0.922 rg
+39.6850393700787407 240.9451181102361943 Td
+(E. Task Checklist & PWA Support) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 226.7718897637794271 Td
+(• Daily Routine Checklist: Real-time digital tasks \(e.g., verify fire extinguishers, test emergency exit doors\).) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 214.0159842519684616 Td
+(• Progressive Web App \(PWA\): Installable on Android and iOS devices via "Add to Home Screen" without App Store delays.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 201.2600787401573825 Td
+(• Offline Service Worker Support: Offline caching ensures continuous UI and emergency operation during signal loss.) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0.059 0.09 0.165 rg
+39.6850393700787407 180.0002362204724022 Td
+(3. Admin Command Center & Headquarters Dashboard) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.145 0.388 0.922 rg
+39.6850393700787407 162.9923622047243725 Td
+(A. Real-Time Operations & Live Feed) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 148.8191338582676053 Td
+(• Executive KPI Counters: Live counts of Total Scans Today, Active Guards on Duty, Pending Checkpoints, and Open Incidents.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 136.0632283464566399 Td
+(• Live Scans Stream: Real-time incoming feed showing guard name, checkpoint location, exact timestamp, and GPS) Tj
+T* (coordinates.) Tj
+ET
+0.89 0.91 0.94 RG
+39.6850393700787407 34.0157480314960665 m
+555.5949606299211609 34.0157480314960665 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.392 0.455 0.545 rg
+39.6850393700787407 19.8425196850394059 Td
+(MUVE QR System Overview  |  Confidential - For Office Review) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.392 0.455 0.545 rg
+514.9549606299211746 19.8425196850394059 Td
+(Page 1 of 2) Tj
+ET
+endstream
+endobj
+5 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 6 0 R
+>>
+endobj
+6 0 obj
+<<
+/Length 7810
+>>
+stream
+0.5670000000000001 w
+0 G
+0.15 0.39 0.92 rg
+39.6850393700787407 813.5435433070865656 515.9099212598424629 -4.2519685039370083 re
+f
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.145 0.388 0.922 rg
+39.6850393700787407 785.1970866141732586 Td
+(B. Incident Operations Center \(/admin/incidents\)) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 771.0238582677164914 Td
+(• Audible Alarm in Admin Room: Plays a siren on the supervisor computer immediately upon an SOS trigger or critical incident.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 758.2679527559055259 Td
+(• Evidence Photo Viewer: Full-resolution modal for reviewing photos uploaded by field guards.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 745.5120472440944468 Td
+(• Status & Action Logging: Full incident lifecycle management \(Open -> In Progress -> Resolved\) with supervisor resolution) Tj
+T* (notes.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 720.0002362204724022 Td
+(• Audit CSV Export: One-click export of incident reports for security audits, insurance claims, and client compliance.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.145 0.388 0.922 rg
+39.6850393700787407 698.7403937007873083 Td
+(C. QR Code & Checkpoint Management) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 684.5671653543306547 Td
+(• Multi-Zone Hierarchy: Organize checkpoints by Building, Floor, Zone, and Description.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 671.8112598425196893 Td
+(• Printable Batch QR Sheets: Generates crisp, branded QR codes ready for printing and physical mounting.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 659.0553543307086102 Td
+(• Dynamic Token Rotation: Regulate and rotate checkpoint security tokens at any time.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.145 0.388 0.922 rg
+39.6850393700787407 637.7955118110235162 Td
+(D. Guard Performance & Accountability Analytics) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 623.6222834645668627 Td
+(• Tour Completion Tracking: Pinpoints missed checkpoints, patrol lapses, and incomplete tours.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 610.8663779527558972 Td
+(• Patrol Punctuality & Duration: Tracks time elapsed between checkpoints to prevent rushing or patrol skipping.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.145 0.388 0.922 rg
+39.6850393700787407 589.6065354330708033 Td
+(E. User Management & Access Control \(RBAC\)) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 575.4333070866141497 Td
+(• Role Permissions: Strict separation between Administrators \(HQ control, reports\) and Officers/Guards \(mobile patrol only\).) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 562.6774015748030706 Td
+(• Audit Trail: Immutable timestamped log of all patrol activities, logins, and system changes.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+51.0236220472441033 549.9214960629921052 Td
+(• Management Reports: Generate daily, weekly, and monthly summaries with CSV/PDF export.) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0.059 0.09 0.165 rg
+39.6850393700787407 528.6616535433070112 Td
+(4. Key Business Benefits for the Organization) Tj
+ET
+0. G
+0.5670000000000001 w
+0. G
+0.5670000000000001 w
+0.06 0.09 0.16 rg
+0.78 G
+0. w
+0.06 0.09 0.16 rg
+39.6850393700787407 511.6537795275589815 155.9055118110236435 -20.9250000000000007 re
+f
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+1. g
+44.6850393700787478 498.5787795275589929 Td
+(Key Benefit) Tj
+ET
+0.06 0.09 0.16 rg
+0.78 G
+0. w
+0.06 0.09 0.16 rg
+195.59055118110237 511.6537795275589815 360.0044094488188193 -20.9250000000000007 re
+f
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+1. g
+200.59055118110237 498.5787795275589929 Td
+(How MUVE QR Delivers) Tj
+ET
+0. G
+0.5670000000000001 w
+1. g
+0.89 0.91 0.94 RG
+0.2834645669291339 w
+1. g
+39.6850393700787407 490.728779527559027 155.9055118110236435 -29.5500000000000007 re
+B
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.145 0.388 0.922 rg
+44.6850393700787478 478.5037795275590042 Td
+(100% Guard Accountability) Tj
+ET
+1. g
+0.89 0.91 0.94 RG
+0.2834645669291339 w
+1. g
+195.59055118110237 490.728779527559027 360.0044094488188193 -29.5500000000000007 re
+B
+BT
+/F1 8.5 Tf
+9.7749999999999986 TL
+0.2 0.255 0.333 rg
+200.59055118110237 478.5037795275590042 Td
+(Eliminates falsified paper logbooks. Every checkpoint scan is cryptographically signed with) Tj
+T* (GPS coordinates and tamper-resistant timestamps.) Tj
+ET
+1. g
+0.89 0.91 0.94 RG
+0.2834645669291339 w
+1. g
+39.6850393700787407 461.1787795275590156 155.9055118110236435 -29.5500000000000007 re
+B
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.145 0.388 0.922 rg
+44.6850393700787478 448.9537795275590497 Td
+(Zero Dedicated Hardware Cost) Tj
+ET
+1. g
+0.89 0.91 0.94 RG
+0.2834645669291339 w
+1. g
+195.59055118110237 461.1787795275590156 360.0044094488188193 -29.5500000000000007 re
+B
+BT
+/F1 8.5 Tf
+9.7749999999999986 TL
+0.2 0.255 0.333 rg
+200.59055118110237 448.9537795275590497 Td
+(Runs on guards' existing Android or iOS smartphones. No expensive proprietary batons,) Tj
+T* (RFID wands, or docking stations required.) Tj
+ET
+1. g
+0.89 0.91 0.94 RG
+0.2834645669291339 w
+1. g
+39.6850393700787407 431.6287795275590042 155.9055118110236435 -29.5500000000000007 re
+B
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.145 0.388 0.922 rg
+44.6850393700787478 419.4037795275590383 Td
+(Officer Life Safety & Panic) Tj
+T* (Response) Tj
+ET
+1. g
+0.89 0.91 0.94 RG
+0.2834645669291339 w
+1. g
+195.59055118110237 431.6287795275590042 360.0044094488188193 -29.5500000000000007 re
+B
+BT
+/F1 8.5 Tf
+9.7749999999999986 TL
+0.2 0.255 0.333 rg
+200.59055118110237 419.4037795275590383 Td
+(5-second hold SOS button with loud dual-tone emergency siren and instant GPS broadcast) Tj
+T* (ensures rapid backup during attacks or medical emergencies.) Tj
+ET
+1. g
+0.89 0.91 0.94 RG
+0.2834645669291339 w
+1. g
+39.6850393700787407 402.078779527558936 155.9055118110236435 -29.5500000000000007 re
+B
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.145 0.388 0.922 rg
+44.6850393700787478 389.8537795275589701 Td
+(Real-Time Facility Maintenance) Tj
+ET
+1. g
+0.89 0.91 0.94 RG
+0.2834645669291339 w
+1. g
+195.59055118110237 402.078779527558936 360.0044094488188193 -29.5500000000000007 re
+B
+BT
+/F1 8.5 Tf
+9.7749999999999986 TL
+0.2 0.255 0.333 rg
+200.59055118110237 389.8537795275589701 Td
+(Hazards, leaks, and damages are photographed and flagged immediately, minimizing facility) Tj
+T* (downtime and property liability.) Tj
+ET
+1. g
+0.89 0.91 0.94 RG
+0.2834645669291339 w
+1. g
+39.6850393700787407 372.5287795275589247 155.9055118110236435 -29.5500000000000007 re
+B
+BT
+/F2 8.5 Tf
+9.7749999999999986 TL
+0.145 0.388 0.922 rg
+44.6850393700787478 360.3037795275589588 Td
+(Client Transparency & SLA Proof) Tj
+ET
+1. g
+0.89 0.91 0.94 RG
+0.2834645669291339 w
+1. g
+195.59055118110237 372.5287795275589247 360.0044094488188193 -29.5500000000000007 re
+B
+BT
+/F1 8.5 Tf
+9.7749999999999986 TL
+0.2 0.255 0.333 rg
+200.59055118110237 360.3037795275589588 Td
+(Instantly generate verified PDF and CSV reports to prove contractual security SLA) Tj
+T* (compliance to property owners and auditors.) Tj
+ET
+0. G
+0.5670000000000001 w
+0.78 G
+0. w
+0. G
+0.5670000000000001 w
+0. G
+0.5670000000000001 w
+0.89 0.91 0.94 RG
+39.6850393700787407 34.0157480314960665 m
+555.5949606299211609 34.0157480314960665 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.392 0.455 0.545 rg
+39.6850393700787407 19.8425196850394059 Td
+(MUVE QR System Overview  |  Confidential - For Office Review) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.392 0.455 0.545 rg
+514.9549606299211746 19.8425196850394059 Td
+(Page 2 of 2) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R 5 0 R ]
+/Count 2
+>>
+endobj
+7 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+8 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+9 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+10 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+19 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+20 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 7 0 R
+/F2 8 0 R
+/F3 9 0 R
+/F4 10 0 R
+/F5 11 0 R
+/F6 12 0 R
+/F7 13 0 R
+/F8 14 0 R
+/F9 15 0 R
+/F10 16 0 R
+/F11 17 0 R
+/F12 18 0 R
+/F13 19 0 R
+/F14 20 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+21 0 obj
+<<
+/Producer (jsPDF 4.2.1)
+/CreationDate (D:20261019145319+05'30')
+>>
+endobj
+22 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 23
+0000000000 65535 f 
+0000016624 00000 n 
+0000018449 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000008625 00000 n 
+0000008762 00000 n 
+0000016687 00000 n 
+0000016812 00000 n 
+0000016942 00000 n 
+0000017075 00000 n 
+0000017213 00000 n 
+0000017337 00000 n 
+0000017466 00000 n 
+0000017598 00000 n 
+0000017734 00000 n 
+0000017862 00000 n 
+0000017989 00000 n 
+0000018118 00000 n 
+0000018251 00000 n 
+0000018353 00000 n 
+0000018699 00000 n 
+0000018785 00000 n 
+trailer
+<<
+/Size 23
+/Root 22 0 R
+/Info 21 0 R
+/ID [ <E36EEDD014A9A9796A9D08DB19747D82> <E36EEDD014A9A9796A9D08DB19747D82> ]
+>>
+startxref
+18889
+%%EOF

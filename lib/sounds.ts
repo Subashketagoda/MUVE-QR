@@ -159,6 +159,127 @@ class SoundEngine {
   public isPlaying(): boolean {
     return this.isSirenPlaying
   }
+
+  /**
+   * 📻 Motorola PTT Key Tone / Talk-Permit Grant Tone
+   * 3 rapid ascending chirps (880Hz -> 1046Hz -> 1318Hz) indicating mic is open.
+   */
+  public playPTTKeyTone() {
+    const ctx = this.getContext()
+    if (!ctx) return
+    const now = ctx.currentTime
+
+    const freqs = [880, 1046.5, 1318.5]
+    freqs.forEach((freq, idx) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, now + idx * 0.04)
+
+      gain.gain.setValueAtTime(0.2, now + idx * 0.04)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + (idx + 1) * 0.04)
+
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+
+      osc.start(now + idx * 0.04)
+      osc.stop(now + (idx + 1) * 0.04)
+    })
+  }
+
+  /**
+   * 📻 Classic End-of-Transmission Roger Beep + Squelch Tail
+   * Clear 1200Hz tone followed by a realistic radio RF white-noise squelch burst.
+   */
+  public playRogerBeep() {
+    const ctx = this.getContext()
+    if (!ctx) return
+    const now = ctx.currentTime
+
+    // 1. Clear Roger Tone
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(1174.66, now) // D6 tone
+
+    gain.gain.setValueAtTime(0.22, now)
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12)
+
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+
+    osc.start(now)
+    osc.stop(now + 0.12)
+
+    // 2. Realistic Squelch Tail Noise Burst right after tone
+    this.playRadioSquelchBurst(90, now + 0.11)
+  }
+
+  /**
+   * 📻 Radio Squelch Noise Burst (Simulates RF Carrier Cut)
+   */
+  public playRadioSquelchBurst(durationMs = 80, startTime?: number) {
+    const ctx = this.getContext()
+    if (!ctx) return
+    const t = startTime ?? ctx.currentTime
+    const duration = durationMs / 1000
+
+    try {
+      const bufferSize = Math.floor(ctx.sampleRate * duration)
+      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
+      const output = noiseBuffer.getChannelData(0)
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1
+      }
+
+      const whiteNoise = ctx.createBufferSource()
+      whiteNoise.buffer = noiseBuffer
+
+      // Bandpass filter to make it sound like tactical FM radio receiver noise
+      const filter = ctx.createBiquadFilter()
+      filter.type = 'bandpass'
+      filter.frequency.setValueAtTime(1600, t)
+      filter.Q.setValueAtTime(1.8, t)
+
+      const gain = ctx.createGain()
+      gain.gain.setValueAtTime(0.12, t)
+      gain.gain.exponentialRampToValueAtTime(0.001, t + duration)
+
+      whiteNoise.connect(filter)
+      filter.connect(gain)
+      gain.connect(ctx.destination)
+
+      whiteNoise.start(t)
+      whiteNoise.stop(t + duration)
+    } catch {
+      // Audio buffer creation fallback
+    }
+  }
+
+  /**
+   * 📻 Alert tone when an incoming radio transmission begins
+   */
+  public playIncomingTransmissionAlert() {
+    const ctx = this.getContext()
+    if (!ctx) return
+    const now = ctx.currentTime
+
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(740, now)
+    osc.frequency.setValueAtTime(987.77, now + 0.05)
+
+    gain.gain.setValueAtTime(0.18, now)
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12)
+
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+
+    osc.start(now)
+    osc.stop(now + 0.12)
+  }
 }
 
 export const soundEngine = new SoundEngine()
+

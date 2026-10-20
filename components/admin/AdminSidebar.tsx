@@ -18,6 +18,7 @@ import {
   TrendingUp,
   Trophy,
   AlertTriangle,
+  Mic,
 } from 'lucide-react'
 
 interface AdminSidebarProps {
@@ -30,6 +31,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, setMobil
 
   const navItems = [
     { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/admin/walkie-talkie', label: 'Walkie-Talkie PTT', icon: Mic, badge: 'VOICE' },
     { href: '/admin/incidents', label: 'Incidents & Hazards', icon: AlertTriangle, badge: 'NEW' },
     { href: '/admin/performance', label: 'Staff Patrol Leaderboard', icon: Trophy, badge: 'TV' },
     { href: '/admin/live-scans', label: 'Live Scans', icon: Radio, badge: 'LIVE' },

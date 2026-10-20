@@ -28,6 +28,7 @@ import {
   PhoneCall,
   Siren,
   Radio,
+  Mic,
   X,
 } from 'lucide-react'
 import { TodoRow } from '@/types/database'
@@ -475,6 +476,15 @@ export default function UserHomePage() {
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span>Live Ready</span>
               </div>
+              {/* 📻 WALKIE-TALKIE PTT HEADER BUTTON */}
+              <Link
+                href="/app/walkie-talkie"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/90 hover:bg-slate-800 border border-emerald-500/50 text-[11px] font-black uppercase tracking-wider text-emerald-300 active:scale-95 transition shadow-sm"
+                title="Open Walkie-Talkie (PTT Radio)"
+              >
+                <Radio className="w-3.5 h-3.5 text-[#D4FC04] animate-pulse" />
+                <span>PTT</span>
+              </Link>
               {/* 🚨 5-SEC HOLD SOS BUTTON */}
               <div className="relative select-none">
                 <button
@@ -687,6 +697,41 @@ export default function UserHomePage() {
           </div>
           <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center group-hover:translate-x-1 transition text-white">
             <ChevronRight className="w-4 h-4" />
+          </div>
+        </Link>
+
+        {/* 📻 TACTICAL WALKIE-TALKIE PTT RADIO CARD */}
+        <Link
+          href="/app/walkie-talkie"
+          className="relative overflow-hidden p-4 rounded-3xl bg-gradient-to-r from-[#0b1720] via-[#072430] to-[#09151c] text-white shadow-xl border-2 border-emerald-500/50 flex items-center justify-between active:scale-[0.98] transition group"
+        >
+          {/* Subtle glow effect */}
+          <div className="absolute -top-12 -right-12 w-36 h-36 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none group-hover:bg-emerald-500/30 transition" />
+
+          <div className="flex items-center gap-3.5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-[#D4FC04] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition shadow-lg">
+              <Radio className="w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 px-1.5 py-0.5 rounded font-mono">
+                  CH 01 LIVE
+                </span>
+                <span className="text-xs font-mono font-bold text-emerald-300">
+                  462.5625 MHz
+                </span>
+              </div>
+              <h4 className="text-base font-black text-white tracking-tight mt-0.5 flex items-center gap-1.5">
+                <span>WALKIE-TALKIE (PTT)</span>
+                <span className="text-xs text-[#D4FC04] font-mono">📻</span>
+              </h4>
+              <p className="text-[11px] text-slate-300">
+                Hold to talk • 2-way live voice with guards & dispatch
+              </p>
+            </div>
+          </div>
+          <div className="w-9 h-9 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center group-hover:translate-x-1 transition text-[#D4FC04] flex-shrink-0 relative z-10">
+            <Mic className="w-4 h-4" />
           </div>
         </Link>
 
