@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { Bell, BellRing, Volume2, ShieldAlert, CheckCircle2, X, MapPin, User, ArrowRight, AlertTriangle, QrCode } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase/client'
+import { soundEngine } from '@/lib/sounds'
 
 // Helper: Convert Base64 URL to Uint8Array for VAPID subscription
 function urlBase64ToUint8Array(base64String: string) {
@@ -243,8 +244,88 @@ export function LockScreenNotificationManager() {
     }
     navigator.serviceWorker?.addEventListener('message', onSwMessage)
 
+    // 📻 Realtime Walkie-Talkie Radio Listener Across All App Pages
+    const handleIncomingRadio = (tx: any) => {
+      if (typeof window === 'undefined' || !tx) return
+      // If currently on dedicated walkie-talkie page, let WalkieTalkieWidget handle playback
+      if (window.location.pathname.includes('/walkie-talkie')) return
+
+      let myId = ''
+      try {
+        const saved = localStorage.getItem('muve_user')
+        if (saved) myId = JSON.parse(saved).id || ''
+      } catch {}
+
+      if (tx.sender_id === myId) return
+
+      soundEngine.unlockAudio()
+      soundEngine.playIncomingTransmissionAlert()
+      if ('vibrate' in navigator) {
+        navigator.vibrate([100, 60, 100])
+      }
+
+      toast.info(`📻 [${tx.sender_callsign}] Radio: ${tx.code_text || 'Incoming Voice...'}`, {
+        duration: 5000,
+        action: {
+          label: 'OPEN RADIO',
+          onClick: () => {
+            window.location.href = window.location.pathname.startsWith('/admin')
+              ? '/admin/walkie-talkie'
+              : '/app/walkie-talkie'
+          },
+        },
+      })
+
+      if (tx.audio_base64) {
+        setTimeout(() => {
+          try {
+            const audio = new Audio(tx.audio_base64)
+            audio.volume = 0.9
+            audio.onended = () => {
+              soundEngine.playRogerBeep()
+            }
+            audio.play().catch(() => {})
+          } catch {}
+        }, 220)
+      } else if (tx.code_text && 'speechSynthesis' in window) {
+        setTimeout(() => {
+          try {
+            window.speechSynthesis.cancel()
+            const u = new SpeechSynthesisUtterance(`${tx.sender_callsign}: ${tx.code_text}`)
+            u.rate = 1.05
+            u.pitch = 0.95
+            u.onend = () => soundEngine.playRogerBeep()
+            window.speechSynthesis.speak(u)
+          } catch {}
+        }, 220)
+      }
+    }
+
+    let radioBc: BroadcastChannel | null = null
+    try {
+      if ('BroadcastChannel' in window) {
+        radioBc = new BroadcastChannel('muve_walkie_talkie_bus')
+        radioBc.onmessage = (event) => {
+          if (event.data?.type === 'NEW_TRANSMISSION' && event.data.transmission) {
+            handleIncomingRadio(event.data.transmission)
+          }
+        }
+      }
+    } catch {}
+
+    const radioSbChan = supabase.channel('muve_radio_global_ch1', {
+      config: { broadcast: { self: false } },
+    })
+    radioSbChan
+      .on('broadcast', { event: 'tx' }, ({ payload }) => {
+        if (payload) handleIncomingRadio(payload)
+      })
+      .subscribe()
+
     return () => {
       navigator.serviceWorker?.removeEventListener('message', onSwMessage)
+      if (radioBc) radioBc.close()
+      supabase.removeChannel(radioSbChan)
     }
   }, [subscribeToPush, playAlertSound, vibratePhone])
 

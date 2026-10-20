@@ -161,6 +161,29 @@ class SoundEngine {
   }
 
   /**
+   * Unlock AudioContext on first user interaction
+   */
+  public unlockAudio(): boolean {
+    const ctx = this.getContext()
+    if (!ctx) return false
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {})
+    }
+    return true
+  }
+
+  /**
+   * 📻 Radio Check Chime: Dual chirp followed by squelch to test speaker
+   */
+  public playRadioCheckChime() {
+    this.unlockAudio()
+    this.playIncomingTransmissionAlert()
+    setTimeout(() => {
+      this.playRogerBeep()
+    }, 180)
+  }
+
+  /**
    * 📻 Motorola PTT Key Tone / Talk-Permit Grant Tone
    * 3 rapid ascending chirps (880Hz -> 1046Hz -> 1318Hz) indicating mic is open.
    */

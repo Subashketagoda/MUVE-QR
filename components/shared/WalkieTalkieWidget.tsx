@@ -27,6 +27,7 @@ import {
   OnlineOperator,
 } from '@/lib/walkie-talkie-store'
 import { soundEngine } from '@/lib/sounds'
+import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
 interface WalkieTalkieWidgetProps {
@@ -69,17 +70,22 @@ export function WalkieTalkieWidget({
   const [isTransmitting, setIsTransmitting] = useState(false)
   const [txDurationSeconds, setTxDurationSeconds] = useState(0)
   const [speakerEnabled, setSpeakerEnabled] = useState(true)
-  const [volume, setVolume] = useState(0.85)
+  const [volume, setVolume] = useState(0.9)
+  const [audioUnlocked, setAudioUnlocked] = useState(false)
+  const [isRealtimeActive, setIsRealtimeActive] = useState(false)
   const [audioPermissionGranted, setAudioPermissionGranted] = useState<boolean | null>(null)
   const [activePlaybackId, setActivePlaybackId] = useState<string | null>(null)
   const [incomingTransmitter, setIncomingTransmitter] = useState<string | null>(null)
 
-  // Refs for Recording
+  // Refs for Recording & Real-time Audio
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const txTimerRef = useRef<any>(null)
   const txStartTimeRef = useRef<number>(0)
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null)
+  const sbChannelRef = useRef<any>(null)
+  const seenTxIdsRef = useRef<Set<string>>(new Set())
+  const isInitialFetchRef = useRef(true)
   const isTransmittingRef = useRef<boolean>(false)
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
@@ -87,25 +93,126 @@ export function WalkieTalkieWidget({
   const animationFrameRef = useRef<number | null>(null)
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null)
 
-  // -------------------------------------------------------------
-  // 1. Data Fetching & Sync
-  // -------------------------------------------------------------
-  const fetchRadioData = useCallback(async (chanId: string) => {
-    try {
-      const res = await fetch(`/api/walkie-talkie?channel=${chanId}&t=${Date.now()}`, {
-        cache: 'no-store',
-      })
-      const data = await res.json()
-      if (data.success) {
-        setTransmissions(data.transmissions || [])
-        setOperators(data.operators || [])
-      }
-    } catch (e) {
-      console.warn('[WalkieTalkie] Error fetching radio data:', e)
-    } finally {
-      setLoading(false)
+  // Global Audio Unlock on first user touch/click/press anywhere
+  useEffect(() => {
+    const unlock = () => {
+      soundEngine.unlockAudio()
+      setAudioUnlocked(true)
+    }
+    window.addEventListener('click', unlock, { once: true })
+    window.addEventListener('touchstart', unlock, { once: true })
+    window.addEventListener('keydown', unlock, { once: true })
+    return () => {
+      window.removeEventListener('click', unlock)
+      window.removeEventListener('touchstart', unlock)
+      window.removeEventListener('keydown', unlock)
     }
   }, [])
+
+  // -------------------------------------------------------------
+  // 2. Play Audio Transmission or Synthesized 10-Code (Real-Time)
+  // -------------------------------------------------------------
+  const handleIncomingTransmission = useCallback(
+    (tx: WalkieTransmission) => {
+      if (!speakerEnabled) return
+
+      soundEngine.unlockAudio()
+      setAudioUnlocked(true)
+      soundEngine.playIncomingTransmissionAlert()
+      setIncomingTransmitter(tx.sender_callsign)
+
+      toast.info(`📻 [${tx.sender_callsign}] Radio Incoming...`, {
+        duration: 3500,
+      })
+
+      setTimeout(() => {
+        if (tx.audio_base64) {
+          try {
+            if (audioPlayerRef.current) {
+              audioPlayerRef.current.pause()
+            }
+            const audio = new Audio(tx.audio_base64)
+            audio.volume = volume
+            audioPlayerRef.current = audio
+            setActivePlaybackId(tx.id)
+
+            audio.onended = () => {
+              setActivePlaybackId(null)
+              setIncomingTransmitter(null)
+              soundEngine.playRogerBeep()
+            }
+            audio.onerror = () => {
+              setActivePlaybackId(null)
+              setIncomingTransmitter(null)
+            }
+            audio.play().catch((err) => {
+              console.warn('[WalkieTalkie] Autoplay restricted by browser, user tap required:', err)
+              setActivePlaybackId(null)
+              setIncomingTransmitter(null)
+              toast('🔊 Tap to hear voice message from ' + tx.sender_callsign, {
+                action: {
+                  label: 'PLAY',
+                  onClick: () => {
+                    audio.play().catch(() => {})
+                  },
+                },
+              })
+            })
+          } catch {
+            setActivePlaybackId(null)
+            setIncomingTransmitter(null)
+          }
+        } else if (tx.code_text) {
+          speakRadioMessage(tx.code_text, tx.sender_callsign, tx.id)
+        }
+      }, 200)
+    },
+    [speakerEnabled, volume]
+  )
+
+  // -------------------------------------------------------------
+  // 1. Data Fetching & Real-Time Sync
+  // -------------------------------------------------------------
+  const fetchRadioData = useCallback(
+    async (chanId: string) => {
+      try {
+        const res = await fetch(`/api/walkie-talkie?channel=${chanId}&t=${Date.now()}`, {
+          cache: 'no-store',
+        })
+        const data = await res.json()
+        if (data.success && Array.isArray(data.transmissions)) {
+          const incomingList: WalkieTransmission[] = data.transmissions
+
+          if (isInitialFetchRef.current) {
+            incomingList.forEach((t) => seenTxIdsRef.current.add(t.id))
+            isInitialFetchRef.current = false
+          } else {
+            // Detect newly arrived transmissions and play them immediately
+            incomingList.forEach((tx) => {
+              if (!seenTxIdsRef.current.has(tx.id)) {
+                seenTxIdsRef.current.add(tx.id)
+                if (tx.sender_id !== user.id) {
+                  const ageMs = Date.now() - new Date(tx.created_at).getTime()
+                  // Only auto-play if fresh (transmitted within last 45 seconds)
+                  if (ageMs < 45000) {
+                    handleIncomingTransmission(tx)
+                  }
+                }
+              }
+            })
+          }
+
+          setTransmissions(incomingList)
+          setOperators(data.operators || [])
+        }
+      } catch (e) {
+        console.warn('[WalkieTalkie] Error fetching radio data:', e)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [user.id, handleIncomingTransmission]
+  )
 
   // Heartbeat Presence Ping
   const pingPresence = useCallback(
@@ -130,11 +237,44 @@ export function WalkieTalkieWidget({
     [user, callsign, selectedChannel.id]
   )
 
+  // Supabase Realtime WebSocket + BroadcastChannel Lifecycle
   useEffect(() => {
+    isInitialFetchRef.current = true
     fetchRadioData(selectedChannel.id)
     pingPresence(false)
 
-    // BroadcastChannel for instant inter-tab audio communication
+    // 1. Connect Supabase Realtime Broadcast Channel (Sub-100ms multi-device delivery)
+    if (sbChannelRef.current) {
+      supabase.removeChannel(sbChannelRef.current)
+    }
+
+    const channelName = `muve_radio_${selectedChannel.id}`
+    const chan = supabase.channel(channelName, {
+      config: { broadcast: { self: false } },
+    })
+
+    chan
+      .on('broadcast', { event: 'tx' }, ({ payload }) => {
+        const tx: WalkieTransmission = payload
+        if (tx && tx.channel_id === selectedChannel.id) {
+          seenTxIdsRef.current.add(tx.id)
+          setTransmissions((prev) => [tx, ...prev.filter((t) => t.id !== tx.id)])
+
+          // If from another user, play incoming sound & speech/audio immediately!
+          if (tx.sender_id !== user.id) {
+            handleIncomingTransmission(tx)
+          }
+        }
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setIsRealtimeActive(true)
+        }
+      })
+
+    sbChannelRef.current = chan
+
+    // 2. BroadcastChannel for instant inter-tab audio communication on same device
     let bc: BroadcastChannel | null = null
     try {
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -148,15 +288,13 @@ export function WalkieTalkieWidget({
           if (msg.type === 'NEW_TRANSMISSION') {
             const tx: WalkieTransmission = msg.transmission
             if (tx.channel_id === selectedChannel.id) {
+              seenTxIdsRef.current.add(tx.id)
               setTransmissions((prev) => [tx, ...prev.filter((t) => t.id !== tx.id)])
 
-              // If from another user, play incoming sound & speech/audio
               if (tx.sender_id !== user.id) {
                 handleIncomingTransmission(tx)
               }
             }
-          } else if (msg.type === 'PING') {
-            fetchRadioData(selectedChannel.id)
           }
         }
       }
@@ -164,64 +302,20 @@ export function WalkieTalkieWidget({
       // Ignore
     }
 
-    // Polling interval for multi-device sync
+    // 3. Fast polling fallback interval (1200ms) to ensure zero missed packets
     const pollInterval = setInterval(() => {
       fetchRadioData(selectedChannel.id)
       pingPresence(isTransmittingRef.current)
-    }, 4000)
+    }, 1200)
 
     return () => {
       clearInterval(pollInterval)
       if (bc) bc.close()
+      if (sbChannelRef.current) {
+        supabase.removeChannel(sbChannelRef.current)
+      }
     }
-  }, [selectedChannel.id, fetchRadioData, pingPresence, user.id])
-
-  // -------------------------------------------------------------
-  // 2. Play Audio Transmission or Synthesized 10-Code
-  // -------------------------------------------------------------
-  const handleIncomingTransmission = useCallback(
-    (tx: WalkieTransmission) => {
-      if (!speakerEnabled) return
-
-      soundEngine.playIncomingTransmissionAlert()
-      setIncomingTransmitter(tx.sender_callsign)
-
-      setTimeout(() => {
-        if (tx.audio_base64) {
-          try {
-            if (audioPlayerRef.current) {
-              audioPlayerRef.current.pause()
-            }
-            const audio = new Audio(tx.audio_base64)
-            audio.volume = volume
-            audioPlayerRef.current = audio
-            setActivePlaybackId(tx.id)
-
-            audio.onended = () => {
-              setActivePlaybackId(null)
-              setIncomingTransmitter(null)
-              soundEngine.playRogerBeep()
-            }
-            audio.onerror = () => {
-              setActivePlaybackId(null)
-              setIncomingTransmitter(null)
-            }
-            audio.play().catch(() => {
-              setActivePlaybackId(null)
-              setIncomingTransmitter(null)
-            })
-          } catch {
-            setActivePlaybackId(null)
-            setIncomingTransmitter(null)
-          }
-        } else if (tx.code_text) {
-          // Play synthetic voice transmission with radio tone
-          speakRadioMessage(tx.code_text, tx.sender_callsign, tx.id)
-        }
-      }, 350)
-    },
-    [speakerEnabled, volume]
-  )
+  }, [selectedChannel.id, fetchRadioData, pingPresence, user.id, handleIncomingTransmission])
 
   const speakRadioMessage = (text: string, senderCallsign: string, txId?: string) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
@@ -490,9 +584,23 @@ export function WalkieTalkieWidget({
       const data = await res.json()
       if (data.success && data.transmission) {
         const newTx = data.transmission
+        seenTxIdsRef.current.add(newTx.id)
         setTransmissions((prev) => [newTx, ...prev.filter((t) => t.id !== newTx.id)])
 
-        // Broadcast to other browser tabs immediately
+        // 1. Broadcast over Supabase Realtime WebSocket for instant sub-100ms multi-device delivery!
+        if (sbChannelRef.current) {
+          try {
+            sbChannelRef.current.send({
+              type: 'broadcast',
+              event: 'tx',
+              payload: newTx,
+            })
+          } catch (err) {
+            console.warn('[WalkieTalkie] Supabase broadcast error:', err)
+          }
+        }
+
+        // 2. Broadcast to other browser tabs immediately
         if (broadcastChannelRef.current) {
           broadcastChannelRef.current.postMessage({
             type: 'NEW_TRANSMISSION',
@@ -596,6 +704,34 @@ export function WalkieTalkieWidget({
               <div className="w-1 h-2 bg-amber-400 rounded-full" />
             </div>
           </div>
+        </div>
+
+        {/* Real-time Net Connection & Audio Unlock Bar */}
+        <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-slate-950/90 border border-slate-800 text-[11px] font-mono mb-3 shadow-inner">
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isRealtimeActive ? 'bg-emerald-400 animate-ping shadow-[0_0_8px_#34d399]' : 'bg-emerald-500'
+              }`}
+            />
+            <span className="text-emerald-300 font-bold uppercase tracking-wider text-[10px]">
+              {isRealtimeActive ? 'REALTIME RADIO NET: LIVE' : 'CONNECTING RADIO NET...'}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playRadioCheckChime()
+              setAudioUnlocked(true)
+              toast.success('🔊 Radio speaker tested and unmuted!')
+            }}
+            className="px-2.5 py-0.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-[#D4FC04] border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 active:scale-95 transition"
+            title="Test radio speaker audio"
+          >
+            <Volume2 className="w-3 h-3 text-[#D4FC04]" />
+            <span>TEST AUDIO</span>
+          </button>
         </div>
 
         {/* ============================================================ */}
